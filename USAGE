@@ -1,0 +1,36 @@
+MTsat pipeline
+===================
+
+Run MTsat pipeline
+
+USAGE
+
+nextflow run main.nf [OPTIONAL_ARGUMENTS] (--root) (--BIDS)
+
+DESCRIPTION
+
+    --root=/path/to/[root]              Root folder containing multiple subjects
+
+                                        [root]
+                                        ├── sub-01
+                                        │   └── anat
+                                        │       ├── sub-01_acq-MTon_MTS.nii.gz
+                                        │       ├── sub-01_acq-MToff_MTS.nii.gz
+                                        │       └── sub-01_acq-T1w_MTS.nii.gz
+                                        └── sub-02
+                                            └── anat
+                                                ├── sub-02_acq-MTon_MTS.nii.gz
+                                                ├── sub-02_acq-MToff_MTS.nii.gz
+                                                └── sub-02_acq-T1w_MTS.nii.gz
+
+
+Files should be compressed Nifti files (.nii.gz)
+
+OPTIONAL ARGUMENTS (current value)
+
+
+NOTES
+BIDS/non-BIDS
+ANTs
+Octave/MATLAB
+qMRLab 
