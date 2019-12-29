@@ -87,8 +87,7 @@ else if(params.root && !params.bids){
     /* Look for B1map in fmap folders */
     Channel 
     .fromPath("$root/**/*B1plusmap.nii.gz",
-                    maxDepth:1)
-    .ifEmpty{[it.parent.name,"EMPTY"]}                                
+                    maxDepth:1)                              
     .map{[it.parent.name, it]}
 
 
@@ -185,19 +184,23 @@ process Align_And_Extract {
     """
 }
 
-/*Merge tw1_post with outputs from the prev. process and b1plus*/
 
-t1w_post.into{t1wa;t1wb}
-mtsat_from_preproc.into{mfpa;mfpb}
+/* Split t1w_post into two to deal with B1map cases */
+t1w_post.into{t1w_post_a;t1w_post_b}
 
-t1wa
-    .join(mfpa)
+/* Split mtsat_from_preproc into two to deal with B1map cases */
+mtsat_from_preproc.into{mfp_a;mfp_b}
+
+/*Merge tw1_post with mtsat_from_preproc and b1plus.*/
+t1w_post_a
+    .join(mfp_a)
     .join(b1plus)
-    .set{mtsat_for_fitting_2}
+    .set{mtsat_for_fitting_with_b1}
 
+/*Merge tw1_post with mtsat_from_preproc only.*/
 t1wb
-    .join(mfpb)
-    .set{mtsat_for_fitting}
+    .join(mfp_b)
+    .set{mtsat_for_fitting_without_b1}
 
 /* When has_b1map set to true, process won't take those w/o a matching B1map*/
 process Fit_MTsat_With_B1map{
@@ -210,7 +213,7 @@ process Fit_MTsat_With_B1map{
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(mask), file(b1map) from mtsat_for_fitting_2
+        file(mask), file(b1map) from mtsat_for_fitting_with_b1
 
 
     output:
@@ -238,7 +241,7 @@ process Fit_MTsat_Without_B1map{
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(mask) from mtsat_for_fitting
+        file(mask) from mtsat_for_fitting_without_b1
 
     output:
         file "${sid}_dene.txt"
