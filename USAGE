@@ -11,23 +11,47 @@ DESCRIPTION
 
     --root=/path/to/[root]              Root folder containing multiple subjects
 
+    If --bids true                      BIDS convention (BEP001 as of late 2019)
+
                                         [root]
                                         ├── sub-01
-                                        │   └── anat
-                                        │       ├── sub-01_acq-MTon_MTS.nii.gz
-                                        │       ├── sub-01_acq-MToff_MTS.nii.gz
-                                        │       └── sub-01_acq-T1w_MTS.nii.gz
+                                        │   │── anat
+                                        │   │   ├── sub-01_acq-MTon_MTS.nii.gz
+                                        |   |   ├── sub-01_acq-MTon_MTS.json
+                                        │   │   ├── sub-01_acq-MToff_MTS.nii.gz
+                                        │   │   ├── sub-01_acq-MToff_MTS.json
+                                        │   │   ├── sub-01_acq-T1w_MTS.nii.gz                           
+                                        │   │   └── sub-01_acq-T1w_MTS.json
+                                        │   └── fmap
+                                        │       └── sub-01_B1plusmap.nii.gz (optional)
                                         └── sub-02
-                                            └── anat
-                                                ├── sub-02_acq-MTon_MTS.nii.gz
-                                                ├── sub-02_acq-MToff_MTS.nii.gz
-                                                └── sub-02_acq-T1w_MTS.nii.gz
+                                            │── anat
+                                            │   ├── sub-02_acq-MTon_MTS.nii.gz
+                                            |   ├── sub-02_acq-MTon_MTS.json
+                                            │   ├── sub-02_acq-MToff_MTS.nii.gz
+                                            │   ├── sub-02_acq-MToff_MTS.json
+                                            │   ├── sub-02_acq-T1w_MTS.nii.gz                           
+                                            │   └── sub-02_acq-T1w_MTS.json
+                                            └── fmap
+                                                └── sub-02_B1plusmap.nii.gz (optional)
 
-
+    If --bids true                      Custom convention 
+                                        [root]
+                                        ├── S1
+                                        │   ├── MTw.nii.gz
+                                        │   ├── PDw.nii.gz
+                                        │   ├── T1w.nii.gz 
+                                        │   ├── B1plusmap.nii.gz    (optional)
+                                        │   └── mtsat_protocol.json (optional)
+                                        └── S2
+                                            ├── MTw.nii.gz
+                                            ├── PDw.nii.gz
+                                            ├── T1w.nii.gz
+                                            ├── B1plusmap.nii.gz    (optional)
+                                            └── mtsat_protocol.json (optional)                                                
 Files should be compressed Nifti files (.nii.gz)
 
 OPTIONAL ARGUMENTS (current value)
-
 
 NOTES
 BIDS/non-BIDS

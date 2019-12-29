@@ -55,14 +55,18 @@ if(params.root && params.bids){
     /* Here, alphabetical indexes matter. Therefore, MToff -> MTon -> T1w */
     in_data = Channel
         .fromFilePairs("$root/**/anat/sub-*_acq-{MToff,MTon,T1w}_MTS.nii.gz", maxDepth: 2, size: 3, flat: true)
-
     (pdw, mtw, t1w) = in_data
         .map{sid, MToff, MTon, T1w  -> [    tuple(sid, MToff),
                                             tuple(sid, MTon),
                                             tuple(sid, T1w)]}                                   
         .separate(3)
-       
-}
+    /* Look for B1map in fmap folders */
+    Channel 
+    .fromPath("$root/**/fmap/sub-*_B1plusmap.nii.gz",
+                    maxDepth:2)                
+    .map{[it.parent.parent.name, it]}
+    .into{b1plus}   
+}   
 /*If data is not BIDS-compatible, define a custom directory structure
     Please see USAGE for further details. 
 */ 
@@ -93,15 +97,16 @@ log.info ""
 log.info "DATA"
 log.info ""
 if (params.bids){
-log.info "BIDS option has been enabled."
+log.info "== BIDS option has been enabled."
 log.info "qMRI protocols will be read from sidecar .json files."
 log.info "If a B1plusmap is provided in the fmap folder, correction factor defined in the nexflow.config will be taken into account."
 }
 else{
-log.info "Custom file/folder organization described in USAGE will be assumed."
+log.info "== Custom file/folder organization described in USAGE will be assumed."
 log.info "If an mtsat_protocol.json file is provided for a subject, acquisition metadata will be overridden. Otherwise, those defined in nextflow.config will be used."
 }
 
+log.info ""
 log.info "OPTIONS"
 log.info "======="
 log.info ""
@@ -133,7 +138,8 @@ log.info "B1 correction factor: $params.b1_cor_factor"
 /*Perform rigid registration to correct for head movement across scans:
     - MTw (moving) --> T1w (fixed)
     - PDw (moving) --> T1w (fixed)
-*/        
+*/     
+/*   
 process Align_Input_Volumes {
     cpus 2
     container 'qmrlab/ants'
@@ -173,3 +179,4 @@ process Align_Input_Volumes {
 
     """
 }
+*/    
