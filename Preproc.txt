@@ -1,0 +1,21 @@
+    antsRegistration -d $params.dim\\ 
+        --float 0\\ 
+        -o [${sid}_mtw2t1w,${sid}_acq-MTon-to-T1w_MTS.nii.gz]\\ 
+        --transform $params.transform\\ 
+        --metric $params.metric[$t1w,$mtw,$params.metric_weight,\\
+        $params.metric_bins,$params.metric_sampling,$params.metric_samplingprct]\\ 
+        --convergence $params.convergence\\ 
+        --shrink-factors $params.shrink\\ 
+        --smoothing-sigmas $params.smoothing
+
+    antsRegistration -d $params.dim\\ 
+        --float 0\\ 
+        -o [${sid}_pdw2t1w,${sid}_acq-MToff-to-T1w_MTS.nii.gz]\\ 
+        --transform $params.transform\\ 
+        --metric $params.metric[$t1w,$pdw,$params.metric_weight,\\
+        $params.metric_bins,$params.metric_sampling,$params.metric_samplingprct]\\ 
+        --convergence $params.convergence\\ 
+        --shrink-factors $params.shrink\\ 
+        --smoothing-sigmas $params.smoothing
+    
+    bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold  

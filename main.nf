@@ -60,17 +60,37 @@ if(params.root && params.bids){
                                             tuple(sid, MTon),
                                             tuple(sid, T1w)]}                                   
         .separate(3)
+                 
     /* Look for B1map in fmap folders */
-    Channel 
-    .fromPath("$root/**/fmap/sub-*_B1plusmap.nii.gz",
-                    maxDepth:2)                
-    .map{[it.parent.parent.name, it]}
-    .into{b1plus}   
+    Channel
+           .fromPath("$root/**/fmap/sub-*_B1plusmap.nii.gz", maxDepth:2)   
+           .map{[it.parent.parent.name, it]}
+           .set{b1plus}      
+             
 }   
+
 /*If data is not BIDS-compatible, define a custom directory structure
     Please see USAGE for further details. 
 */ 
 else if(params.root && !params.bids){
+    log.info "Input: $params.root"
+    root = file(params.root)
+    /* Here, alphabetical indexes matter. Therefore, MToff -> MTon -> T1w */
+    in_data = Channel
+        .fromFilePairs("$root/**/*{MTw.nii.gz,PDw.nii.gz,T1w.nii.gz}", maxDepth: 2, size: 3, flat: true){it.parent.name}
+    (mtw, pdw, t1w) = in_data
+        .map{sid, MTw, PDw, T1w  -> [    tuple(sid, MTw),
+                                         tuple(sid, PDw),
+                                         tuple(sid, T1w)]}                                   
+        .separate(3)
+
+    /* Look for B1map in fmap folders */
+    Channel 
+    .fromPath("$root/**/*B1plusmap.nii.gz",
+                    maxDepth:1)
+    .ifEmpty{[it.parent.name,"EMPTY"]}                                
+    .map{[it.parent.name, it]}
+
 
 }
 else{
@@ -80,12 +100,15 @@ else{
 /*Each data type is defined as a channel. To pass all the channels 
   to the same process accurately, these channels must be joined. 
 */ 
-pdw.set{pdw_ch}
 
-pdw_ch
+/*Split T1w into two channels*/
+t1w.into{t1w_pre; t1w_post}
+
+/* Merge PDw, MTw and T1w for alingment and brain extraction*/
+pdw 
     .join(mtw)
-    .join(t1w)
-    .set{mtsat_ch}
+    .join(t1w_pre)
+    .set{mtsat_for_preproc}
 
 log.info "qMRflow: MTsat pipeline"
 log.info "======================="
@@ -95,6 +118,7 @@ log.info ""
 
 log.info ""
 log.info "DATA"
+log.info "===="
 log.info ""
 if (params.bids){
 log.info "== BIDS option has been enabled."
@@ -111,6 +135,7 @@ log.info "OPTIONS"
 log.info "======="
 log.info ""
 log.info "[ANTs Registration]"
+log.info "-------------------"
 log.info "Dimensionality: $params.dim"
 log.info "Metric: $params.metric"
 log.info "Weight: $params.metric_weight"
@@ -123,60 +148,108 @@ log.info "Shrink factors: $params.shrink"
 log.info "Smoothing sigmas: $params.smoothing"
 log.info ""
 log.info "[qMRLab mt_sat]"
-log.info ""
-log.info "NOTE: mt_sat protocol values are subjected to change based on the (--bids) option. See more at USAGE."
+log.info "---------------"
+log.info "NOTE: mt_sat protocol inputs are subjected to change based on the (--bids) option. "
+log.info "\tSee more details at USAGE."
 log.info ""
 log.info "Default values provided in the nextflow.config: "
 log.info ""
 log.info "Flip angles:\n\t MTon: $params.mtw_fa\n\t MToff: $params.pdw_fa\n\t T1w: $params.t1w_fa"
-log.info ""
 log.info "Repetition times:\n\t MTon: $params.mtw_tr\n\t MToff: $params.pdw_tr\n\t T1w: $params.t1w_tr"
-log.info ""
 log.info "B1 correction factor: $params.b1_cor_factor"
-
 
 /*Perform rigid registration to correct for head movement across scans:
     - MTw (moving) --> T1w (fixed)
     - PDw (moving) --> T1w (fixed)
 */     
-/*   
-process Align_Input_Volumes {
+
+process Align_And_Extract {
     cpus 2
-    container 'qmrlab/ants'
 
     if(params.root && params.bids){
         publishDir = "$root/derivatives/qMRLab"
     }
 
     input:
-    set sid, file(pdw), file(mtw), file(t1w) from mtsat_ch
+    set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_preproc
 
     output:
-    set sid, "${sid}_acq-MTon-to-T1w_MTS.nii.gz", "${sid}_acq-MToff-to-T1w_MTS.nii.gz"\
-        into mtsat_ch_reg
+    set sid, "${sid}_acq-MTon-to-T1w_MTS.nii.gz", "${sid}_acq-MToff-to-T1w_MTS.nii.gz",\
+    "${sid}_acq-T1w_mask.nii.gz" into mtsat_from_preproc
 
     script:
     """
-    antsRegistration -d $params.dim\\ 
-        --float 0\\ 
-        -o [${sid}_mtw2t1w,${sid}_acq-MTon-to-T1w_MTS.nii.gz]\\ 
-        --transform $params.transform\\ 
-        --metric $params.metric[$t1w,$mtw,$params.metric_weight,\\
-        $params.metric_bins,$params.metric_sampling,$params.metric_samplingprct]\\ 
-        --convergence $params.convergence\\ 
-        --shrink-factors $params.shrink\\ 
-        --smoothing-sigmas $params.smoothing
-
-    antsRegistration -d $params.dim\\ 
-        --float 0\\ 
-        -o [${sid}_pdw2t1w,${sid}_acq-MToff-to-T1w_MTS.nii.gz]\\ 
-        --transform $params.transform\\ 
-        --metric $params.metric[$t1w,$pdw,$params.metric_weight,\\
-        $params.metric_bins,$params.metric_sampling,$params.metric_samplingprct]\\ 
-        --convergence $params.convergence\\ 
-        --shrink-factors $params.shrink\\ 
-        --smoothing-sigmas $params.smoothing
-
+    touch ${sid}_acq-MTon-to-T1w_MTS.nii.gz
+    touch ${sid}_acq-MToff-to-T1w_MTS.nii.gz
+    touch ${sid}_acq-T1w_mask.nii.gz
     """
 }
-*/    
+
+/*Merge tw1_post with outputs from the prev. process and b1plus*/
+
+t1w_post.into{t1wa;t1wb}
+mtsat_from_preproc.into{mfpa;mfpb}
+
+t1wa
+    .join(mfpa)
+    .join(b1plus)
+    .set{mtsat_for_fitting_2}
+
+t1wb
+    .join(mfpb)
+    .set{mtsat_for_fitting}
+
+/* When has_b1map set to true, process won't take those w/o a matching B1map*/
+process Fit_MTsat_With_B1map{
+    cpus 2
+
+    publishDir = "$root/derivatives/qMRLab"
+
+    when:
+        params.has_b1 == true
+
+    input:
+        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(mask), file(b1map) from mtsat_for_fitting_2
+
+
+    output:
+        file "${sid}_dene.txt"
+
+    script: 
+        """
+        echo "$mtw_reg\n" >> ${sid}_dene.txt 
+        echo "$pdw_reg\n" >> ${sid}_dene.txt
+        echo "$t1w\n" >> ${sid}_dene.txt 
+        echo "$mask\n" >> ${sid}_dene.txt 
+        echo "$b1map\n" >> ${sid}_dene.txt 
+        echo "With B1map\n" >> ${sid}_dene.txt  
+        """
+}
+
+/*Agnostic to any B1maps that may exist if params.has_b1 set to false..*/
+process Fit_MTsat_Without_B1map{
+    cpus 2
+
+    publishDir = "$root/derivatives/qMRLab"
+    
+    when:
+        params.has_b1 == false
+
+    input:
+        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(mask) from mtsat_for_fitting
+
+    output:
+        file "${sid}_dene.txt"
+
+    script: 
+        """
+        echo "$mtw_reg\n" >> ${sid}_dene.txt 
+        echo "$pdw_reg\n" >> ${sid}_dene.txt
+        echo "$t1w\n" >> ${sid}_dene.txt 
+        echo "$mask\n" >> ${sid}_dene.txt 
+        echo "Without B1map\n" >> ${sid}_dene.txt  
+        """
+}
+
