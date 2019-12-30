@@ -76,8 +76,8 @@ else if(params.root && !params.bids){
     log.info "Input: $params.root"
     root = file(params.root)
     /* Here, alphabetical indexes matter. Therefore, MToff -> MTon -> T1w */
-    in_data = Channel
-        .fromFilePairs("$root/**/*{MTw.nii.gz,PDw.nii.gz,T1w.nii.gz}", maxDepth: 2, size: 3, flat: true){it.parent.name}
+    in_data = Channel.fromFilePairs("$root/**/*{MTw.nii.gz,PDw.nii.gz,T1w.nii.gz}", maxDepth: 1, size: 3, flat: true){it.parent.name}
+
     (mtw, pdw, t1w) = in_data
         .map{sid, MTw, PDw, T1w  -> [    tuple(sid, MTw),
                                          tuple(sid, PDw),
@@ -89,6 +89,7 @@ else if(params.root && !params.bids){
     .fromPath("$root/**/*B1plusmap.nii.gz",
                     maxDepth:1)                              
     .map{[it.parent.name, it]}
+    .set{b1plus}
 
 
 }
@@ -172,9 +173,9 @@ log.warn "Process won't take any (possibly) existing B1maps into account."
 process Align_And_Extract {
     cpus 2
 
-    if(params.root && params.bids){
-        publishDir = "$root/derivatives/qMRLab"
-    }
+
+    publishDir = "$root/derivatives/qMRLab"
+
 
     input:
     set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_preproc
