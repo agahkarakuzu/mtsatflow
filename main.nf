@@ -18,7 +18,7 @@ Author:
     Agah Karakuzu 2019
     agahkarakuzu@gmail.com 
 
-Users: Please see USAGE for utilizatoin purposes.
+Users: Please see USAGE for utilization purposes.
  */
 
 /*Set defaults for parameters determining logic flow to false*/
@@ -91,7 +91,6 @@ else if(params.root && !params.bids){
     .map{[it.parent.name, it]}
     .set{b1plus}
 
-
 }
 else{
     error "ERROR: Arguments (--root) and (--bids) must be passed. See USAGE."
@@ -101,14 +100,18 @@ else{
   to the same process accurately, these channels must be joined. 
 */ 
 
-/*Split T1w into two channels*/
-t1w.into{t1w_pre; t1w_post}
+/*Split T1w into three channels
+    t1w_pre_ch1 --> mtsat_for_alignment (see line 110)
+    t1w_pre_ch2 --> mtsat_for_bet
+    t1w_pre_ch3 --> t1w_post
+*/
+t1w.into{t1w_pre_ch1; mtsat_for_bet; t1w_post}
 
-/* Merge PDw, MTw and T1w for alingment and brain extraction*/
+/* Merge PDw, MTw and T1w for alignment*/
 pdw 
     .join(mtw)
-    .join(t1w_pre)
-    .set{mtsat_for_preproc}
+    .join(t1w_pre_ch1)
+    .set{mtsat_for_alignment}
 
 log.info "qMRflow: MTsat pipeline"
 log.info "======================="
@@ -151,116 +154,215 @@ log.info "---------------"
 log.info "NOTE: mt_sat protocol inputs are subjected to change based on the (--bids) option. "
 log.info "\tSee more details at USAGE."
 log.info ""
-log.info "Default values provided in the nextflow.config: "
+log.info "Default values can be modified in the nextflow.config: "
 log.info ""
-log.info "Flip angles:\n\t MTon: $params.mtw_fa\n\t MToff: $params.pdw_fa\n\t T1w: $params.t1w_fa"
-log.info "Repetition times:\n\t MTon: $params.mtw_tr\n\t MToff: $params.pdw_tr\n\t T1w: $params.t1w_tr"
+log.info "Default protocol flip angles (FA):\n\t MTon: $params.dflt_mtw_fa\n\t MToff: $params.dflt_pdw_fa\n\t T1w: $params.dflt_t1w_fa"
+log.info "Default protocol repetition times (TR):\n\t MTon: $params.dflt_mtw_tr\n\t MToff: $params.dflt_pdw_tr\n\t T1w: $params.dflt_t1w_tr"
 log.info ""
-if (params.use_b1map){
-log.info "B1map option has been enabled."  
-log.warn "Process will be skipped for participants lacking a B1map."   
-log.info "B1 correction factor: $params.b1_cor_factor"}
-if (!params.use_b1map){
-log.info "B1map option has been disabled."
-log.warn "Process won't take any (possibly) existing B1maps into account."
+if (params.USE_B1){
+log.info "B1+ correction has been ENABLED."  
+log.warn "Process will be skipped for participants missing a B1map file."   
+log.info "B1 correction factor: $params.COR_B1"}
+if (!params.USE_B1){
+log.info "B1+ correction has been DISABLED."
+log.warn "Process will NOT take any (possibly) existing B1maps into account."
 }
+
+new groovy.json.JsonSlurper().parseText('{ "alpha": 1, "beta": "Hello"}').each { k, v -> params[k] = v }
+
+println params.alpha
+println params.beta
 
 /*Perform rigid registration to correct for head movement across scans:
     - MTw (moving) --> T1w (fixed)
     - PDw (moving) --> T1w (fixed)
 */     
 
-process Align_And_Extract {
+process Align_Input_Volumes {
     cpus 2
 
-
-    publishDir = "$root/derivatives/qMRLab"
-
+    publishDir = "$root/derivatives/qMRLab/" 
 
     input:
-    set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_preproc
+    set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_alignment
 
     output:
-    set sid, "${sid}_acq-MTon-to-T1w_MTS.nii.gz", "${sid}_acq-MToff-to-T1w_MTS.nii.gz",\
-    "${sid}_acq-T1w_mask.nii.gz" into mtsat_from_preproc
-
+    set sid, "${sid}_acq-MTon-to-T1w_MTS.nii.gz", "${sid}_acq-MToff-to-T1w_MTS.nii.gz"\
+    into mtsat_from_alignment
+   
     script:
     """
     touch ${sid}_acq-MTon-to-T1w_MTS.nii.gz
     touch ${sid}_acq-MToff-to-T1w_MTS.nii.gz
-    touch ${sid}_acq-T1w_mask.nii.gz
     """
 }
 
+process Extract_Brain{
+    cpus 2
+
+    publishDir = "$root/derivatives/qMRLab/"
+
+    when:
+        params.USE_BET == true
+
+    input:
+    set sid, file(t1w) from mtsat_for_bet
+
+    output:
+    set sid, "${sid}_acq-T1w_mask.nii.gz" optional true into mtsat_from_bet
+    
+    script:
+        """
+        touch ${sid}_acq-T1w_mask.nii.gz
+        """
+
+}
 
 /* Split t1w_post into two to deal with B1map cases */
-t1w_post.into{t1w_post_a;t1w_post_b}
+t1w_post.into{t1w_post_ch1;t1w_post_ch2}
 
-/* Split mtsat_from_preproc into two to deal with B1map cases */
-mtsat_from_preproc.into{mfp_a;mfp_b}
+/* Split mtsat_from_alignment into two to deal with B1map cases */
+mtsat_from_alignment.into{mfa_ch1;mfa_ch2}
 
-/*Merge tw1_post with mtsat_from_preproc and b1plus.*/
-t1w_post_a
-    .join(mfp_a)
+/* There is no input optional true*/
+/* Hence, empty mtsat_from_bet must be created*/
+if (!params.USE_BET){
+    Channel
+        .empty()
+        .set{mtsat_from_bet}
+}
+
+/* Split mtsat_from_bet into two to deal with B1map cases */
+mtsat_from_bet.into{mtsat_from_bet_ch1;mtsat_from_bet_ch2}
+
+/*Merge tw1_post with mtsat_from_alignment and b1plus.*/
+t1w_post_ch1
+    .join(mfa_ch1)
     .join(b1plus)
     .set{mtsat_for_fitting_with_b1}
 
-/*Merge tw1_post with mtsat_from_preproc only.*/
-t1w_post_b
-    .join(mfp_b)
+mtsat_for_fitting_with_b1.into{mtsat_with_b1_bet;mtsat_with_b1}
+
+/*Merge tw1_post with mtsat_from_alignment only.*/
+t1w_post_ch2
+    .join(mfa_ch2)
     .set{mtsat_for_fitting_without_b1}
 
-/* When use_b1map set to true, process won't take those w/o a matching B1map*/
-process Fit_MTsat_With_B1map{
+mtsat_for_fitting_without_b1.into{mtsat_without_b1_bet;mtsat_without_b1}
+
+/* We need to join these channels to avoid problems.*/
+mtsat_with_b1_bet
+    .join(mtsat_from_bet_ch1 )
+    .set{mtsat_with_b1_bet_merged}
+
+/* When USE_B1 set to true, process won't take those w/o a matching B1map*/
+process Fit_MTsat_With_B1map_With_Bet{
     cpus 2
 
-    publishDir = "$root/derivatives/qMRLab"
+    publishDir = "$root/derivatives/qMRLab/"
 
     when:
-        params.use_b1map == true
+        params.USE_B1 == true && params.USE_BET == true
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(mask), file(b1map) from mtsat_for_fitting_with_b1
-
+        file(b1map), file(mask) from mtsat_with_b1_bet_merged
+        
 
     output:
         file "${sid}_dene.txt"
 
     script: 
-        """
-        echo "$mtw_reg\n" >> ${sid}_dene.txt 
-        echo "$pdw_reg\n" >> ${sid}_dene.txt
-        echo "$t1w\n" >> ${sid}_dene.txt 
-        echo "$mask\n" >> ${sid}_dene.txt 
-        echo "$b1map\n" >> ${sid}_dene.txt 
-        echo "With B1map\n" >> ${sid}_dene.txt  
-        """
+            """
+            echo "$mtw_reg\n" >> ${sid}_dene.txt 
+            echo "$pdw_reg\n" >> ${sid}_dene.txt
+            echo "$t1w\n" >> ${sid}_dene.txt 
+            echo "$mask\n" >> ${sid}_dene.txt 
+            echo "$b1map\n" >> ${sid}_dene.txt 
+            echo "With B1map\n" >> ${sid}_dene.txt 
+            echo "With BET\n" >> ${sid}_dene.txt  
+            """
 }
 
-/*Agnostic to any B1maps that may exist if params.use_b1map set to false..*/
-process Fit_MTsat_Without_B1map{
+process Fit_MTsat_With_B1map_Without_Bet{
     cpus 2
 
-    publishDir = "$root/derivatives/qMRLab"
+    publishDir = "$root/derivatives/qMRLab/"
+
+    when:
+        params.USE_B1 == true && params.USE_BET == false
+
+    input:
+        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(b1map) from mtsat_with_b1
+
+    output:
+        file "${sid}_dene.txt"
+
+    script: 
+            """
+            echo "$mtw_reg\n" >> ${sid}_dene.txt 
+            echo "$pdw_reg\n" >> ${sid}_dene.txt
+            echo "$t1w\n" >> ${sid}_dene.txt 
+            echo "$b1map\n" >> ${sid}_dene.txt 
+            echo "With B1map\n" >> ${sid}_dene.txt 
+            echo "Without BET\n" >> ${sid}_dene.txt  
+            """
+}
+
+
+/* We need to join these channels to avoid problems.*/
+mtsat_without_b1_bet
+    .join(mtsat_from_bet_ch2)
+    .set{mtsat_without_b1_bet_merged}
+
+process Fit_MTsat_Without_B1map_With_Bet{
+    cpus 2
+
+    publishDir = "$root/derivatives/qMRLab/"
     
     when:
-        params.use_b1map == false
+        params.USE_B1 == false && params.USE_BET==true
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(mask) from mtsat_for_fitting_without_b1
+        file(mask) from mtsat_without_b1_bet_merged
 
     output:
         file "${sid}_dene.txt"
 
     script: 
-        """
-        echo "$mtw_reg\n" >> ${sid}_dene.txt 
-        echo "$pdw_reg\n" >> ${sid}_dene.txt
-        echo "$t1w\n" >> ${sid}_dene.txt 
-        echo "$mask\n" >> ${sid}_dene.txt 
-        echo "Without B1map\n" >> ${sid}_dene.txt  
-        """
+            """
+            echo "$mtw_reg\n" >> ${sid}_dene.txt 
+            echo "$pdw_reg\n" >> ${sid}_dene.txt
+            echo "$t1w\n" >> ${sid}_dene.txt 
+            echo "$mask\n" >> ${sid}_dene.txt 
+            echo "Without B1map\n" >> ${sid}_dene.txt 
+            echo "With BET\n" >> ${sid}_dene.txt   
+            """
 }
 
+process Fit_MTsat_Without_B1map_Without_Bet{
+    cpus 2
+
+    publishDir = "$root/derivatives/qMRLab/"
+    
+    when:
+        params.USE_B1 == false && params.USE_BET==false
+
+    input:
+        set sid, file(t1w), file(mtw_reg), file(pdw_reg)\
+        from mtsat_without_b1
+
+    output:
+        file "${sid}_dene.txt"
+
+    script: 
+            """
+            echo "$mtw_reg\n" >> ${sid}_dene.txt 
+            echo "$pdw_reg\n" >> ${sid}_dene.txt
+            echo "$t1w\n" >> ${sid}_dene.txt 
+            echo "Without B1map\n" >> ${sid}_dene.txt 
+            echo "Without BET\n" >> ${sid}_dene.txt   
+            """
+}

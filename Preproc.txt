@@ -1,21 +1,29 @@
-    antsRegistration -d $params.dim\\ 
+    antsRegistration -d $params.ants_dim\\ 
         --float 0\\ 
         -o [${sid}_mtw2t1w,${sid}_acq-MTon-to-T1w_MTS.nii.gz]\\ 
-        --transform $params.transform\\ 
-        --metric $params.metric[$t1w,$mtw,$params.metric_weight,\\
-        $params.metric_bins,$params.metric_sampling,$params.metric_samplingprct]\\ 
-        --convergence $params.convergence\\ 
-        --shrink-factors $params.shrink\\ 
-        --smoothing-sigmas $params.smoothing
+        --transform $params.ants_transform\\ 
+        --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
+        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+        --convergence $params.ants_convergence\\ 
+        --shrink-factors $params.ants_shrink\\ 
+        --smoothing-sigmas $params.ants_smoothing
 
-    antsRegistration -d $params.dim\\ 
+    antsRegistration -d $params.ants_dim\\ 
         --float 0\\ 
         -o [${sid}_pdw2t1w,${sid}_acq-MToff-to-T1w_MTS.nii.gz]\\ 
-        --transform $params.transform\\ 
-        --metric $params.metric[$t1w,$pdw,$params.metric_weight,\\
-        $params.metric_bins,$params.metric_sampling,$params.metric_samplingprct]\\ 
-        --convergence $params.convergence\\ 
-        --shrink-factors $params.shrink\\ 
-        --smoothing-sigmas $params.smoothing
+        --transform $params.ants_transform\\ 
+        --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
+        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+        --convergence $params.ants_convergence\\ 
+        --shrink-factors $params.ants_shrink\\ 
+        --smoothing-sigmas $params.ants_smoothing
     
-    bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold  
+    if (params.bet_recursive){
+        """    
+        bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold}
+        """
+    else{
+        """    
+        bet $t1w ${sid}_acq-T1w.nii.gz -m -n -f $params.bet_threshold}
+        """
+        }
