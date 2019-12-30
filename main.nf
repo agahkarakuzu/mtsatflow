@@ -120,13 +120,12 @@ log.info "DATA"
 log.info "===="
 log.info ""
 if (params.bids){
-log.info "== BIDS option has been enabled."
-log.info "qMRI protocols will be read from sidecar .json files."
-log.info "If a B1plusmap is provided in the fmap folder, correction factor defined in the nexflow.config will be taken into account."
+log.info "BIDS option has been enabled."
+log.warn "qMRI protocols will be read from sidecar .json files."
 }
 else{
-log.info "== Custom file/folder organization described in USAGE will be assumed."
-log.info "If an mtsat_protocol.json file is provided for a subject, acquisition metadata will be overridden. Otherwise, those defined in nextflow.config will be used."
+log.info "Custom file/folder organization described in USAGE will be assumed."
+log.warn "If an mtsat_protocol.json file is provided for a subject, acquisition metadata will be overridden. Otherwise, those defined in nextflow.config will be used."
 }
 
 log.info ""
@@ -155,7 +154,15 @@ log.info "Default values provided in the nextflow.config: "
 log.info ""
 log.info "Flip angles:\n\t MTon: $params.mtw_fa\n\t MToff: $params.pdw_fa\n\t T1w: $params.t1w_fa"
 log.info "Repetition times:\n\t MTon: $params.mtw_tr\n\t MToff: $params.pdw_tr\n\t T1w: $params.t1w_tr"
-log.info "B1 correction factor: $params.b1_cor_factor"
+log.info ""
+if (params.use_b1map){
+log.info "B1map option has been enabled."  
+log.warn "Process will be skipped for participants lacking a B1map."   
+log.info "B1 correction factor: $params.b1_cor_factor"}
+if (!params.use_b1map){
+log.info "B1map option has been disabled."
+log.warn "Process won't take any (possibly) existing B1maps into account."
+}
 
 /*Perform rigid registration to correct for head movement across scans:
     - MTw (moving) --> T1w (fixed)
@@ -198,18 +205,18 @@ t1w_post_a
     .set{mtsat_for_fitting_with_b1}
 
 /*Merge tw1_post with mtsat_from_preproc only.*/
-t1wb
+t1w_post_b
     .join(mfp_b)
     .set{mtsat_for_fitting_without_b1}
 
-/* When has_b1map set to true, process won't take those w/o a matching B1map*/
+/* When use_b1map set to true, process won't take those w/o a matching B1map*/
 process Fit_MTsat_With_B1map{
     cpus 2
 
     publishDir = "$root/derivatives/qMRLab"
 
     when:
-        params.has_b1 == true
+        params.use_b1map == true
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
@@ -230,14 +237,14 @@ process Fit_MTsat_With_B1map{
         """
 }
 
-/*Agnostic to any B1maps that may exist if params.has_b1 set to false..*/
+/*Agnostic to any B1maps that may exist if params.use_b1map set to false..*/
 process Fit_MTsat_Without_B1map{
     cpus 2
 
     publishDir = "$root/derivatives/qMRLab"
     
     when:
-        params.has_b1 == false
+        params.use_b1map == false
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
