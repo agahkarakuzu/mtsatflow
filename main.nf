@@ -138,16 +138,16 @@ log.info "======="
 log.info ""
 log.info "[ANTs Registration]"
 log.info "-------------------"
-log.info "Dimensionality: $params.dim"
-log.info "Metric: $params.metric"
-log.info "Weight: $params.metric_weight"
-log.info "Number of bins: $params.metric_bins"
-log.info "Sampling type: $params.metric_sampling"
-log.info "Sampling percentage: $params.metric_samplingprct"
-log.info "Transform: $params.transform"
-log.info "Convergence: $params.convergence"
-log.info "Shrink factors: $params.shrink"
-log.info "Smoothing sigmas: $params.smoothing"
+log.info "Dimensionality: $params.ants_dim"
+log.info "Metric: $params.ants_metric"
+log.info "Weight: $params.ants_metric_weight"
+log.info "Number of bins: $params.ants_metric_bins"
+log.info "Sampling type: $params.ants_metric_sampling"
+log.info "Sampling percentage: $params.ants_metric_samplingprct"
+log.info "Transform: $params.ants_transform"
+log.info "Convergence: $params.ants_convergence"
+log.info "Shrink factors: $params.ants_shrink"
+log.info "Smoothing sigmas: $params.ants_smoothing"
 log.info ""
 log.info "[qMRLab mt_sat]"
 log.info "---------------"
@@ -192,8 +192,25 @@ process Align_Input_Volumes {
    
     script:
     """
-    touch ${sid}_acq-MTon-to-T1w_MTS.nii.gz
-    touch ${sid}_acq-MToff-to-T1w_MTS.nii.gz
+        antsRegistration -d $params.ants_dim\\ 
+        --float 0\\ 
+        -o [${sid}_mtw2t1w,${sid}_acq-MTon-to-T1w_MTS.nii.gz]\\ 
+        --transform $params.ants_transform\\ 
+        --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
+        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+        --convergence $params.ants_convergence\\ 
+        --shrink-factors $params.ants_shrink\\ 
+        --smoothing-sigmas $params.ants_smoothing
+
+    antsRegistration -d $params.ants_dim\\ 
+        --float 0\\ 
+        -o [${sid}_pdw2t1w,${sid}_acq-MToff-to-T1w_MTS.nii.gz]\\ 
+        --transform $params.ants_transform\\ 
+        --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
+        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+        --convergence $params.ants_convergence\\ 
+        --shrink-factors $params.ants_shrink\\ 
+        --smoothing-sigmas $params.ants_smoothing
     """
 }
 
@@ -212,9 +229,15 @@ process Extract_Brain{
     set sid, "${sid}_acq-T1w_mask.nii.gz" optional true into mtsat_from_bet
     
     script:
-        """
-        touch ${sid}_acq-T1w_mask.nii.gz
-        """
+         if (params.bet_recursive){
+            """    
+            bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold}
+            """}
+        else{
+            """    
+            bet $t1w ${sid}_acq-T1w.nii.gz -m -n -f $params.bet_threshold}
+            """
+        }
 
 }
 
@@ -257,7 +280,7 @@ mtsat_with_b1_bet
 
 /* When USE_B1 set to true, process won't take those w/o a matching B1map*/
 process Fit_MTsat_With_B1map_With_Bet{
-    cpus 2
+    cpus 1
 
     publishDir = "$root/derivatives/qMRLab/"
 
@@ -285,7 +308,7 @@ process Fit_MTsat_With_B1map_With_Bet{
 }
 
 process Fit_MTsat_With_B1map_Without_Bet{
-    cpus 2
+    cpus 1
 
     publishDir = "$root/derivatives/qMRLab/"
 
@@ -317,7 +340,7 @@ mtsat_without_b1_bet
     .set{mtsat_without_b1_bet_merged}
 
 process Fit_MTsat_Without_B1map_With_Bet{
-    cpus 2
+    cpus 1
 
     publishDir = "$root/derivatives/qMRLab/"
     
@@ -343,7 +366,7 @@ process Fit_MTsat_Without_B1map_With_Bet{
 }
 
 process Fit_MTsat_Without_B1map_Without_Bet{
-    cpus 2
+    cpus 1
 
     publishDir = "$root/derivatives/qMRLab/"
     
