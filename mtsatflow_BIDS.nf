@@ -7,17 +7,20 @@ with a longitudinal relaxation time (T1) map.
 
 Dependencies: 
     - Advanced notmarization tools (ANTs, https://github.com/ANTsX/ANTs)
-        - Installation: Built from source 
+        - Installation: Built from source (if not Docker)
+    - FSL 
+        - Installation: Built from source (if not Docker)    
     - qMRLab (https://qmrlab.org) 
         - MATLAB/Octave 
 Docker: 
-    - 
+    - qmrlab/minimal
+    - qmrlab/antsfsl
 
 Author:
     Agah Karakuzu 2019
     agahkarakuzu@gmail.com 
 
-Users: Please see USAGE for utilization purposes.
+Users: Please see USAGE for further details
  */
 
 /*Set defaults for parameters determining logic flow to false*/
@@ -119,20 +122,12 @@ log.info "======================="
 log.info ""
 log.info "Start time: $workflow.start"
 log.info ""
-
 log.info ""
 log.info "DATA"
 log.info "===="
 log.info ""
-if (params.bids){
 log.info "BIDS option has been enabled."
 log.warn "qMRI protocols will be read from sidecar .json files."
-}
-else{
-log.info "Custom file/folder organization described in USAGE will be assumed."
-log.warn "If an mtsat_protocol.json file is provided for a subject, acquisition metadata will be overridden. Otherwise, those defined in nextflow.config will be used."
-}
-
 log.info ""
 log.info "OPTIONS"
 log.info "======="
@@ -149,13 +144,15 @@ log.info "Transform: $params.ants_transform"
 log.info "Convergence: $params.ants_convergence"
 log.info "Shrink factors: $params.ants_shrink"
 log.info "Smoothing sigmas: $params.ants_smoothing"
+log.info "[FSL BET]"
+log.info "---------------"
+log.info "Enabled: $params.USE_BET"
+log.info "Fractional intensity threshold: $params.bet_threshold"
+log.info "Robust brain center estimation: $params.bet_recursive"
 log.info ""
 log.info "[qMRLab mt_sat]"
 log.info "---------------"
-log.info "NOTE: mt_sat protocol inputs are subjected to change based on the (--bids) option. "
-log.info "\tSee more details at USAGE."
-log.info ""
-
+log.warn "Acquisition protocols will be read from  sidecar .json files (BIDS)."
 if (params.USE_B1){
 log.info "B1+ correction has been ENABLED."  
 log.warn "Process will be skipped for participants missing a B1map file."   
