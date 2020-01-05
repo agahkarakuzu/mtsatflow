@@ -23,8 +23,7 @@
 %
 %    Metadata files for customized convention: 
 %      
-%        - Option-1 mt_sat_prot.json (see more at USAGE.md)
-%        - Option-2 pass params as pairs
+%        - mt_sat_prot.json (see more at USAGE.md)
 %
 % mt_sat_BIDS(___,PARAM1, VAL1, PARAM2, VAL2,___)
 %
@@ -108,24 +107,6 @@ if nargin>6
     if customFlag
         % Collect parameters when non-BIDS pipeline is used.
         
-       if ~any(cellfun(@isequal,varargin,repmat({'custom_json'},size(varargin))))
-           
-        if any(cellfun(@isequal,varargin,repmat({'mtw_prot'},size(varargin))))
-            idx = find(cellfun(@isequal,varargin,repmat({'mtw_prot'},size(varargin)))==1);
-            Model.Prot.MTw.Mat = varargin{idx+1};
-        end
-        
-        if any(cellfun(@isequal,varargin,repmat({'pdw_prot'},size(varargin))))
-            idx = find(cellfun(@isequal,varargin,repmat({'pdw_prot'},size(varargin)))==1);
-            Model.Prot.PDw.Mat = varargin{idx+1};
-        end
-        
-        if any(cellfun(@isequal,varargin,repmat({'t1w_prot'},size(varargin))))
-            idx = find(cellfun(@isequal,varargin,repmat({'t1w_prot'},size(varargin)))==1);
-            Model.Prot.T1w.Mat = varargin{idx+1};
-        end
-        
-       else % mt_sat_prot.json is passed. 
            
            idx = find(cellfun(@isequal,varargin,repmat({'custom_json'},size(varargin)))==1);
            prt = json2struct(varargin{idx+1});
@@ -135,9 +116,8 @@ if nargin>6
            Model.Prot.PDw.Mat =[prt.PDw.FlipAngle prt.PDw.RepetitionTimeExcitation/1000];
            Model.Prot.T1w.Mat =[prt.T1w.FlipAngle prt.T1w.RepetitionTimeExcitation/1000];
            
-       end
-         
     end
+         
     
 end
 

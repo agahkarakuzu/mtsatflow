@@ -271,17 +271,17 @@ process Fit_MTsat_With_B1map_With_Bet{
         file "${sid}_dene.txt"
 
     script: 
-        """
-        echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
-        echo "PDR $pdw_reg\n" >> ${sid}_dene.txt
-        echo "T1 $t1w\n" >> ${sid}_dene.txt 
-        echo "MASK $mask\n" >> ${sid}_dene.txt 
-        echo "B1 $b1map\n" >> ${sid}_dene.txt 
-        echo "MT $mtw\n" >> ${sid}_dene.txt
-        echo "PD $pdw\n" >> ${sid}_dene.txt  
-        echo "With B1map\n" >> ${sid}_dene.txt 
-        echo "With BET\n" >> ${sid}_dene.txt  
-        """
+       if (params.PLATFORM == 'octave'){
+                log.info "qMRLab::mt_sat | Octave"
+                """
+                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1)"
+                """
+                } else{
+                log.info "qMRLab::mt_sat | MATLAB"    
+                """
+                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1)"
+                """
+                }
 }
 
 process Fit_MTsat_With_B1map_Without_Bet{
@@ -300,16 +300,17 @@ process Fit_MTsat_With_B1map_Without_Bet{
         file "${sid}_dene.txt"
 
     script: 
-            """
-            echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
-            echo "PDR $pdw_reg\n" >> ${sid}_dene.txt
-            echo "T1 $t1w\n" >> ${sid}_dene.txt 
-            echo "B1 $b1map\n" >> ${sid}_dene.txt 
-            echo "MT $mtw\n" >> ${sid}_dene.txt 
-            echo "PD $pdw\n" >> ${sid}_dene.txt
-            echo "With B1map\n" >> ${sid}_dene.txt 
-            echo "Without BET\n" >> ${sid}_dene.txt  
-            """
+             if (params.PLATFORM == 'octave'){
+                log.info "qMRLab::mt_sat | Octave"
+                """
+                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','b1map','$b1map','b1factor',$params.COR_B1)"
+                """
+                } else{
+                log.info "qMRLab::mt_sat | MATLAB"    
+                """
+                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','b1map','$b1map','b1factor',$params.COR_B1)"
+                """
+                }
 }
 
 
@@ -334,16 +335,17 @@ process Fit_MTsat_Without_B1map_With_Bet{
         file "${sid}_dene.txt"
 
     script: 
-            """
-            echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
-            echo "PDW $pdw_reg\n" >> ${sid}_dene.txt
-            echo "T1 $t1w\n" >> ${sid}_dene.txt 
-            echo "MASK $mask\n" >> ${sid}_dene.txt 
-            echo "MT $mtw\n" >> ${sid}_dene.txt
-            echo "PD $pdw\n" >> ${sid}_dene.txt 
-            echo "Without B1map\n" >> ${sid}_dene.txt 
-            echo "With BET\n" >> ${sid}_dene.txt   
-            """
+        if (params.PLATFORM == 'octave'){
+        log.info "qMRLab::mt_sat | Octave"
+        """
+            octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
+        """
+        } else{
+        log.info "qMRLab::mt_sat | MATLAB"    
+        """
+            matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
+        """
+        }
 }
 
 process Fit_MTsat_Without_B1map_Without_Bet{
@@ -362,14 +364,16 @@ process Fit_MTsat_Without_B1map_Without_Bet{
         file "${sid}_dene.txt"
 
     script: 
-            """
-            echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
-            echo "PDR $pdw_reg\n" >> ${sid}_dene.txt
-            echo "T1 $t1w\n" >> ${sid}_dene.txt 
-            echo "MT $mtw\n" >> ${sid}_dene.txt 
-            echo "PD $pdw\n" >> ${sid}_dene.txt 
-            echo "Without B1map\n" >> ${sid}_dene.txt 
-            echo "Without BET\n" >> ${sid}_dene.txt   
-            """
+        if (params.PLATFORM == 'octave'){
+                log.info "qMRLab::mt_sat | Octave"
+                """
+                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json')"
+                """
+                } else{
+                log.info "qMRLab::mt_sat | MATLAB"    
+                """
+                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json')"
+                """
+                }   
 }
 
