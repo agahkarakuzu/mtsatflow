@@ -77,11 +77,13 @@ OPTIONAL ARGUMENTS (current value)
 --ants_convergence              [MxNxO,<convergenceThreshold=1e-6>,<convergenceWindowSize=10>]
                                 Convergence is determined from the number of iterations per level
                                 and is determined by fitting a line to the normalized energy 
-                                profile of the last N iterations (where N is specified by the window size) and determining the slope which is then compared with the convergence threshold.
+                                profile of the last N iterations (where N is specified by the window
+                                size) and determining the slope which is then compared with the convergence threshold.
 --ants_shrink                   [MxNxO] Specify the shrink factor for the virtual domain (typically 
                                 the fixed image) at each level.
 --ants_smoothing                [MxNxO] Specify the sigma of gaussian smoothing at each level.
-                                Units are given in terms of voxels ('vox') or physical spacing ('mm'). Example usage is '4x2x1mm' and '4x2x1vox' where no units implies voxel spacing.
+                                Units are given in terms of voxels ('vox') or physical spacing ('mm'). 
+                                Example usage is '4x2x1mm' and '4x2x1vox' where no units implies voxel spacing.
 --use_b1cor                     [true/false] Use and RF transmit field to correct for flip 
                                 angle imperfections. 
 --b1cor_factor                  [0-1] Correction factor (empirical) for the transmit RF. Only
@@ -148,7 +150,8 @@ REFERENCES
 
 Please cite the following if you use this module:
 
-    Helms, G. et al. 2008. High-resolution maps of magnetization transfer with inherent correction for RF inhomogeneity and T1 relaxation obtained from 3D FLASH MRI. Magn. Reson. Med. 60, 1396?1407.
+    Helms, G. et al. 2008. High-resolution maps of magnetization transfer with inherent correction 
+    for RF inhomogeneity and T1 relaxation obtained from 3D FLASH MRI. Magn. Reson. Med. 60, 1396?1407.
 
 In addition to: 
 

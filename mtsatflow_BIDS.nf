@@ -45,8 +45,8 @@ if(params.help) {
                 "use_b1cor":"$params.USE_B1",
                 "b1cor_factor":"$params.COR_B1",
                 "use_bet":"$params.USE_BET",
-                "bet_recursive":"$bet_recursive",
-                "bet_threshold":"$bet_threshold",
+                "bet_recursive":"$params.bet_recursive",
+                "bet_threshold":"$params.bet_threshold",
                 "platform":"$params.PLATFORM"
                 ]
 
