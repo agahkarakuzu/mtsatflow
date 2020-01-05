@@ -1,7 +1,13 @@
-% Simple wrapper for fitting BIDSified MTSAT data at the subject level. 
+% Simple wrapper for fitting MTSAT data at the subject level.
 %
-% BIDS for quantitative MRI:
-%     https://github.com/bids-standard/bep001
+% Organization of the multi-subject input files:
+%
+%     BIDS    See more at https://github.com/bids-standard/bep001.
+%             Example BIDS qMRI datasets are available at
+%             https://osf.io/k4bs5/
+%
+%     Custom  See more at qMRLab/qMRflow/mt_sat/USAGE.md    
+%
 %
 % Required inputs:
 %
@@ -10,11 +16,16 @@
 %        - pdw_nii 
 %        - t1w_nii  
 %
-%    Metadata file names (.json): 
+%    Metadata files for BIDS (.json): 
 %        - mtw_jsn
 %        - pdw_jsn 
-%        - t1w_jsn    
-% 
+%        - t1w_jsn
+%
+%    Metadata files for customized convention: 
+%      
+%        - Option-1 mt_sat_prot.json (see more at USAGE.md)
+%        - Option-2 pass params as pairs
+%
 % mt_sat_BIDS(___,PARAM1, VAL1, PARAM2, VAL2,___)
 %
 % Parameters include:
@@ -51,7 +62,7 @@
 % =========================================================================
 
 
-function mt_sat_BIDS(mtw_nii,pdw_nii,t1w_nii,mtw_jsn,pdw_jsn,t1w_jsn,varargin)
+function mt_sat_wrapper(mtw_nii,pdw_nii,t1w_nii,mtw_jsn,pdw_jsn,t1w_jsn,varargin)
 
 if moxunit_util_platform_is_octave
     warning('off','all');
@@ -67,6 +78,8 @@ end
 
 Model = mt_sat; 
 data = struct();
+
+if all(isempty(mtw_jsn),isempty(pdw_jsn),isempty(t1w_jsn)); customFlag = 1; end; 
 
 % Account for optional inputs and options.
 if nargin>6
@@ -91,6 +104,41 @@ if nargin>6
         Model.options.B1correctionfactor = varargin{idx+1};
     end
     
+    
+    if customFlag
+        % Collect parameters when non-BIDS pipeline is used.
+        
+       if ~any(cellfun(@isequal,varargin,repmat({'custom_json'},size(varargin))))
+           
+        if any(cellfun(@isequal,varargin,repmat({'mtw_prot'},size(varargin))))
+            idx = find(cellfun(@isequal,varargin,repmat({'mtw_prot'},size(varargin)))==1);
+            Model.Prot.MTw.Mat = varargin{idx+1};
+        end
+        
+        if any(cellfun(@isequal,varargin,repmat({'pdw_prot'},size(varargin))))
+            idx = find(cellfun(@isequal,varargin,repmat({'pdw_prot'},size(varargin)))==1);
+            Model.Prot.PDw.Mat = varargin{idx+1};
+        end
+        
+        if any(cellfun(@isequal,varargin,repmat({'t1w_prot'},size(varargin))))
+            idx = find(cellfun(@isequal,varargin,repmat({'t1w_prot'},size(varargin)))==1);
+            Model.Prot.T1w.Mat = varargin{idx+1};
+        end
+        
+       else % mt_sat_prot.json is passed. 
+           
+           idx = find(cellfun(@isequal,varargin,repmat({'custom_json'},size(varargin)))==1);
+           prt = json2struct(varargin{idx+1});
+           
+           % Set protocol from mt_sat_prot.json
+           Model.Prot.MTw.Mat =[prt.MTw.FlipAngle prt.MTw.RepetitionTimeExcitation/1000];
+           Model.Prot.PDw.Mat =[prt.PDw.FlipAngle prt.PDw.RepetitionTimeExcitation/1000];
+           Model.Prot.T1w.Mat =[prt.T1w.FlipAngle prt.T1w.RepetitionTimeExcitation/1000];
+           
+       end
+         
+    end
+    
 end
 
 
@@ -100,14 +148,18 @@ data.MTw=double(load_nii_data(mtw_nii));
 data.PDw=double(load_nii_data(pdw_nii));
 data.T1w=double(load_nii_data(t1w_nii));
 
-% RepetitionTime --> RepetitionTimeExcitation in BIDS (ms)
-% qMRLab Repetition time is in (s). 
 
-Model.Prot.MTw.Mat =[getfield(json2struct(mtw_jsn),'FlipAngle') getfield(json2struct(mtw_jsn),'RepetitionTimeExcitation')/1000];
-Model.Prot.PDw.Mat =[getfield(json2struct(pdw_jsn),'FlipAngle') getfield(json2struct(pdw_jsn),'RepetitionTimeExcitation')/1000];
-Model.Prot.T1w.Mat =[getfield(json2struct(t1w_jsn),'FlipAngle') getfield(json2struct(t1w_jsn),'RepetitionTimeExcitation')/1000];
+if ~customFlag
 
-% ==== Fit Data ==== 
+    % RepetitionTime --> RepetitionTimeExcitation in BIDS (ms)
+    % qMRLab Repetition time is in (s). 
+    Model.Prot.MTw.Mat =[getfield(json2struct(mtw_jsn),'FlipAngle') getfield(json2struct(mtw_jsn),'RepetitionTimeExcitation')/1000];
+    Model.Prot.PDw.Mat =[getfield(json2struct(pdw_jsn),'FlipAngle') getfield(json2struct(pdw_jsn),'RepetitionTimeExcitation')/1000];
+    Model.Prot.T1w.Mat =[getfield(json2struct(t1w_jsn),'FlipAngle') getfield(json2struct(t1w_jsn),'RepetitionTimeExcitation')/1000];
+
+end
+
+% ==== Fit Data ====
 
 FitResults = FitData(data,Model,0);
 

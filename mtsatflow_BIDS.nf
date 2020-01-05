@@ -13,7 +13,6 @@ Dependencies:
 Docker: 
     - 
 
-
 Author:
     Agah Karakuzu 2019
     agahkarakuzu@gmail.com 
@@ -23,7 +22,6 @@ Users: Please see USAGE for utilization purposes.
 
 /*Set defaults for parameters determining logic flow to false*/
 params.root = false 
-params.bids = false 
 params.help = false
 
 /*Define bindings for --help*/
@@ -49,9 +47,11 @@ Note:
     issue, these (optional) maps are assumed to be located at the fmap
     folder with _B1plusmap suffix.   
 */
-if(params.root && params.bids){
+if(params.root){
     log.info "Input: $params.root"
     root = file(params.root)
+    
+    /* ==== BIDS: MTSat inputs ==== */  
     /* Here, alphabetical indexes matter. Therefore, MToff -> MTon -> T1w */
     in_data = Channel
         .fromFilePairs("$root/**/anat/sub-*_acq-{MToff,MTon,T1w}_MTS.nii.gz", maxDepth: 2, size: 3, flat: true)
@@ -60,40 +60,17 @@ if(params.root && params.bids){
                                             tuple(sid, MTon),
                                             tuple(sid, T1w)]}                                   
         .separate(3)
-                 
-    /* Look for B1map in fmap folders */
+
+    /* ==== BIDS: B1 map ==== */             
+    /* Look for B1map in fmap folder */
     Channel
            .fromPath("$root/**/fmap/sub-*_B1plusmap.nii.gz", maxDepth:2)   
            .map{[it.parent.parent.name, it]}
            .set{b1plus}      
              
 }   
-
-/*If data is not BIDS-compatible, define a custom directory structure
-    Please see USAGE for further details. 
-*/ 
-else if(params.root && !params.bids){
-    log.info "Input: $params.root"
-    root = file(params.root)
-    /* Here, alphabetical indexes matter. Therefore, MToff -> MTon -> T1w */
-    in_data = Channel.fromFilePairs("$root/**/*{MTw.nii.gz,PDw.nii.gz,T1w.nii.gz}", maxDepth: 1, size: 3, flat: true){it.parent.name}
-
-    (mtw, pdw, t1w) = in_data
-        .map{sid, MTw, PDw, T1w  -> [    tuple(sid, MTw),
-                                         tuple(sid, PDw),
-                                         tuple(sid, T1w)]}                                   
-        .separate(3)
-
-    /* Look for B1map in fmap folders */
-    Channel 
-    .fromPath("$root/**/*B1plusmap.nii.gz",
-                    maxDepth:1)                              
-    .map{[it.parent.name, it]}
-    .set{b1plus}
-
-}
 else{
-    error "ERROR: Arguments (--root) and (--bids) must be passed. See USAGE."
+    error "ERROR: Argument (--root) must be passed. See USAGE."
 }
 
 /*Each data type is defined as a channel. To pass all the channels 
@@ -101,15 +78,24 @@ else{
 */ 
 
 /*Split T1w into three channels
-    t1w_pre_ch1 --> mtsat_for_alignment (see line 110)
+    t1w_pre_ch1 --> mtsat_for_alignment
     t1w_pre_ch2 --> mtsat_for_bet
     t1w_pre_ch3 --> t1w_post
 */
 t1w.into{t1w_pre_ch1; mtsat_for_bet; t1w_post}
 
+/*After alignment, we still need simpleName of the parent files 
+ access .json content. 
+    - Given the B1map and Mask options, there are 4 possible processes.
+      Original mtw, pdw and t1w channels should be accessible by them.    
+*/
+
+pdw.into{pdw_pre_ch1;pdw_ch2;pdw_ch3}
+mtw.into{mtw_pre_ch1;mtw_ch2;mtw_ch3}
+
 /* Merge PDw, MTw and T1w for alignment*/
-pdw 
-    .join(mtw)
+pdw_pre_ch1 
+    .join(mtw_pre_ch1)
     .join(t1w_pre_ch1)
     .set{mtsat_for_alignment}
 
@@ -154,11 +140,7 @@ log.info "---------------"
 log.info "NOTE: mt_sat protocol inputs are subjected to change based on the (--bids) option. "
 log.info "\tSee more details at USAGE."
 log.info ""
-log.info "Default values can be modified in the nextflow.config: "
-log.info ""
-log.info "Default protocol flip angles (FA):\n\t MTon: $params.dflt_mtw_fa\n\t MToff: $params.dflt_pdw_fa\n\t T1w: $params.dflt_t1w_fa"
-log.info "Default protocol repetition times (TR):\n\t MTon: $params.dflt_mtw_tr\n\t MToff: $params.dflt_pdw_tr\n\t T1w: $params.dflt_t1w_tr"
-log.info ""
+
 if (params.USE_B1){
 log.info "B1+ correction has been ENABLED."  
 log.warn "Process will be skipped for participants missing a B1map file."   
@@ -168,18 +150,12 @@ log.info "B1+ correction has been DISABLED."
 log.warn "Process will NOT take any (possibly) existing B1maps into account."
 }
 
-new groovy.json.JsonSlurper().parseText('{ "alpha": 1, "beta": "Hello"}').each { k, v -> params[k] = v }
-
-println params.alpha
-println params.beta
-
 /*Perform rigid registration to correct for head movement across scans:
     - MTw (moving) --> T1w (fixed)
     - PDw (moving) --> T1w (fixed)
 */     
 
 process Align_Input_Volumes {
-    cpus 2
 
     publishDir = "$root/derivatives/qMRLab/" 
 
@@ -187,35 +163,17 @@ process Align_Input_Volumes {
     set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_alignment
 
     output:
-    set sid, "${sid}_acq-MTon-to-T1w_MTS.nii.gz", "${sid}_acq-MToff-to-T1w_MTS.nii.gz"\
+    set sid, "${sid}_acq-MTon_MTS_aligned.nii.gz", "${sid}_acq-MToff_MTS_aligned.nii.gz"\
     into mtsat_from_alignment
    
     script:
     """
-        antsRegistration -d $params.ants_dim\\ 
-        --float 0\\ 
-        -o [${sid}_mtw2t1w,${sid}_acq-MTon-to-T1w_MTS.nii.gz]\\ 
-        --transform $params.ants_transform\\ 
-        --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
-        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
-        --convergence $params.ants_convergence\\ 
-        --shrink-factors $params.ants_shrink\\ 
-        --smoothing-sigmas $params.ants_smoothing
-
-    antsRegistration -d $params.ants_dim\\ 
-        --float 0\\ 
-        -o [${sid}_pdw2t1w,${sid}_acq-MToff-to-T1w_MTS.nii.gz]\\ 
-        --transform $params.ants_transform\\ 
-        --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
-        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
-        --convergence $params.ants_convergence\\ 
-        --shrink-factors $params.ants_shrink\\ 
-        --smoothing-sigmas $params.ants_smoothing
+    touch ${sid}_acq-MTon_MTS_aligned.nii.gz
+    touch ${sid}_acq-MToff_MTS_aligned.nii.gz
     """
 }
 
 process Extract_Brain{
-    cpus 2
 
     publishDir = "$root/derivatives/qMRLab/"
 
@@ -231,11 +189,11 @@ process Extract_Brain{
     script:
          if (params.bet_recursive){
             """    
-            bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold}
+            touch ${sid}_acq-T1w_mask.nii.gz
             """}
         else{
             """    
-            bet $t1w ${sid}_acq-T1w.nii.gz -m -n -f $params.bet_threshold}
+            touch ${sid}_acq-T1w_mask.nii.gz
             """
         }
 
@@ -247,40 +205,57 @@ t1w_post.into{t1w_post_ch1;t1w_post_ch2}
 /* Split mtsat_from_alignment into two to deal with B1map cases */
 mtsat_from_alignment.into{mfa_ch1;mfa_ch2}
 
-/* There is no input optional true*/
-/* Hence, empty mtsat_from_bet must be created*/
+/* There is no input optional true concept in nextflow
+The process consuming the individual input channels will 
+only execute if the channel is populated.
+*/
+
+/* We need to conditionally create channels with
+input data or as empty channels.
+*/
 if (!params.USE_BET){
     Channel
         .empty()
         .set{mtsat_from_bet}
 }
 
-/* Split mtsat_from_bet into two to deal with B1map cases */
+/* Split mtsat_from_bet into two to deal with B1map cases later. */
 mtsat_from_bet.into{mtsat_from_bet_ch1;mtsat_from_bet_ch2}
 
 /*Merge tw1_post with mtsat_from_alignment and b1plus.*/
 t1w_post_ch1
     .join(mfa_ch1)
     .join(b1plus)
+    .join(mtw_ch2)
+    .join(pdw_ch2)
     .set{mtsat_for_fitting_with_b1}
 
 mtsat_for_fitting_with_b1.into{mtsat_with_b1_bet;mtsat_with_b1}
 
-/*Merge tw1_post with mtsat_from_alignment only.*/
+/*Merge tw1_post with mtsat_from_alignment only.
+WITHOUT B1 MAP
+*/
 t1w_post_ch2
     .join(mfa_ch2)
+    .join(mtw_ch3)
+    .join(pdw_ch3)
     .set{mtsat_for_fitting_without_b1}
 
 mtsat_for_fitting_without_b1.into{mtsat_without_b1_bet;mtsat_without_b1}
 
-/* We need to join these channels to avoid problems.*/
+/* We need to join these channels to avoid problems.
+WITH B1 MAP
+*/
 mtsat_with_b1_bet
     .join(mtsat_from_bet_ch1 )
     .set{mtsat_with_b1_bet_merged}
 
-/* When USE_B1 set to true, process won't take those w/o a matching B1map*/
+/* Depeding on the nextflow.config 
+settings for USE_B1 and USE_BET, one of th
+following 4 processes will be executed. 
+*/
+
 process Fit_MTsat_With_B1map_With_Bet{
-    cpus 1
 
     publishDir = "$root/derivatives/qMRLab/"
 
@@ -289,22 +264,24 @@ process Fit_MTsat_With_B1map_With_Bet{
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(b1map), file(mask) from mtsat_with_b1_bet_merged
+        file(b1map), file(mtw), file(pdw), file(mask) from mtsat_with_b1_bet_merged
         
 
     output:
         file "${sid}_dene.txt"
 
     script: 
-            """
-            echo "$mtw_reg\n" >> ${sid}_dene.txt 
-            echo "$pdw_reg\n" >> ${sid}_dene.txt
-            echo "$t1w\n" >> ${sid}_dene.txt 
-            echo "$mask\n" >> ${sid}_dene.txt 
-            echo "$b1map\n" >> ${sid}_dene.txt 
-            echo "With B1map\n" >> ${sid}_dene.txt 
-            echo "With BET\n" >> ${sid}_dene.txt  
-            """
+        """
+        echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
+        echo "PDR $pdw_reg\n" >> ${sid}_dene.txt
+        echo "T1 $t1w\n" >> ${sid}_dene.txt 
+        echo "MASK $mask\n" >> ${sid}_dene.txt 
+        echo "B1 $b1map\n" >> ${sid}_dene.txt 
+        echo "MT $mtw\n" >> ${sid}_dene.txt
+        echo "PD $pdw\n" >> ${sid}_dene.txt  
+        echo "With B1map\n" >> ${sid}_dene.txt 
+        echo "With BET\n" >> ${sid}_dene.txt  
+        """
 }
 
 process Fit_MTsat_With_B1map_Without_Bet{
@@ -317,17 +294,19 @@ process Fit_MTsat_With_B1map_Without_Bet{
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(b1map) from mtsat_with_b1
+        file(b1map), file(mtw), file(pdw) from mtsat_with_b1
 
     output:
         file "${sid}_dene.txt"
 
     script: 
             """
-            echo "$mtw_reg\n" >> ${sid}_dene.txt 
-            echo "$pdw_reg\n" >> ${sid}_dene.txt
-            echo "$t1w\n" >> ${sid}_dene.txt 
-            echo "$b1map\n" >> ${sid}_dene.txt 
+            echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
+            echo "PDR $pdw_reg\n" >> ${sid}_dene.txt
+            echo "T1 $t1w\n" >> ${sid}_dene.txt 
+            echo "B1 $b1map\n" >> ${sid}_dene.txt 
+            echo "MT $mtw\n" >> ${sid}_dene.txt 
+            echo "PD $pdw\n" >> ${sid}_dene.txt
             echo "With B1map\n" >> ${sid}_dene.txt 
             echo "Without BET\n" >> ${sid}_dene.txt  
             """
@@ -349,17 +328,19 @@ process Fit_MTsat_Without_B1map_With_Bet{
 
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(mask) from mtsat_without_b1_bet_merged
+        file(mtw), file(pdw), file(mask) from mtsat_without_b1_bet_merged
 
     output:
         file "${sid}_dene.txt"
 
     script: 
             """
-            echo "$mtw_reg\n" >> ${sid}_dene.txt 
-            echo "$pdw_reg\n" >> ${sid}_dene.txt
-            echo "$t1w\n" >> ${sid}_dene.txt 
-            echo "$mask\n" >> ${sid}_dene.txt 
+            echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
+            echo "PDW $pdw_reg\n" >> ${sid}_dene.txt
+            echo "T1 $t1w\n" >> ${sid}_dene.txt 
+            echo "MASK $mask\n" >> ${sid}_dene.txt 
+            echo "MT $mtw\n" >> ${sid}_dene.txt
+            echo "PD $pdw\n" >> ${sid}_dene.txt 
             echo "Without B1map\n" >> ${sid}_dene.txt 
             echo "With BET\n" >> ${sid}_dene.txt   
             """
@@ -374,18 +355,21 @@ process Fit_MTsat_Without_B1map_Without_Bet{
         params.USE_B1 == false && params.USE_BET==false
 
     input:
-        set sid, file(t1w), file(mtw_reg), file(pdw_reg)\
-        from mtsat_without_b1
+        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(mtw), file(pdw) from mtsat_without_b1
 
     output:
         file "${sid}_dene.txt"
 
     script: 
             """
-            echo "$mtw_reg\n" >> ${sid}_dene.txt 
-            echo "$pdw_reg\n" >> ${sid}_dene.txt
-            echo "$t1w\n" >> ${sid}_dene.txt 
+            echo "MTR $mtw_reg\n" >> ${sid}_dene.txt 
+            echo "PDR $pdw_reg\n" >> ${sid}_dene.txt
+            echo "T1 $t1w\n" >> ${sid}_dene.txt 
+            echo "MT $mtw\n" >> ${sid}_dene.txt 
+            echo "PD $pdw\n" >> ${sid}_dene.txt 
             echo "Without B1map\n" >> ${sid}_dene.txt 
             echo "Without BET\n" >> ${sid}_dene.txt   
             """
 }
+

@@ -1,17 +1,19 @@
-MTsat pipeline
+qMRflow mt_sat pipeline
 ===================
-
-Run MTsat pipeline
 
 USAGE
 
-nextflow run main.nf [OPTIONAL_ARGUMENTS] (--root) (--BIDS)
+nextflow run mtsatflow.nf (--root)
+
+nextflow run mtsatflow_BIDS.nf (--root)
 
 DESCRIPTION
 
     --root=/path/to/[root]              Root folder containing multiple subjects
 
-    If --bids true                      BIDS convention (BEP001 as of late 2019)
+FOLDER ORGANIZATION
+
+BIDS convention                         For mtsatflow_BIDS.nf
 
                                         [root]
                                         ├── sub-01
@@ -35,20 +37,21 @@ DESCRIPTION
                                             └── fmap
                                                 └── sub-02_B1plusmap.nii.gz (optional)
 
-    If --bids true                      Custom convention 
+    Customized convention               For mtsatflow.nf
+
                                         [root]
                                         ├── S1
-                                        │   ├── MTw.nii.gz
-                                        │   ├── PDw.nii.gz
-                                        │   ├── T1w.nii.gz 
-                                        │   ├── B1plusmap.nii.gz    (optional)
-                                        │   └── mtsat_protocol.json (optional)
+                                        │   ├── S1_MTw.nii.gz
+                                        │   ├── S1_PDw.nii.gz
+                                        │   ├── S1_T1w.nii.gz 
+                                        │   ├── S1_B1plusmap.nii.gz    (optional)
+                                        │   └── mt_sat_protocol.json   
                                         └── S2
-                                            ├── MTw.nii.gz
-                                            ├── PDw.nii.gz
-                                            ├── T1w.nii.gz
-                                            ├── B1plusmap.nii.gz    (optional)
-                                            └── mtsat_protocol.json (optional)                                                
+                                            ├── S2_MTw.nii.gz
+                                            ├── S2_PDw.nii.gz
+                                            ├── S2_T1w.nii.gz
+                                            ├── S2_B1plusmap.nii.gz    (optional)
+                                            └── mt_sat_protocol.json                                                 
 Files should be compressed Nifti files (.nii.gz)
 
 OPTIONAL ARGUMENTS (current value)
