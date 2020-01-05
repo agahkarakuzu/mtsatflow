@@ -29,8 +29,23 @@ if(params.help) {
     usage = file("$baseDir/USAGE")
 
     cpu_count = Runtime.runtime.availableProcessors()
-    bindings = ["test":"$params.dim",
-                "test2":"$params.transform"]
+    bindings = ["ants_dim":"$params.ants_dim",
+                "ants_metric":"$params.ants_metric",
+                "ants_metric_weight":"$params.ants_metric_weight",
+                "ants_metric_bins":"$params.ants_metric_bins",
+                "ants_metric_sampling":"$params.ants_metric_sampling",
+                "ants_metric_samplingprct":"$params.ants_metric_samplingprct",
+                "ants_transform":"$params.ants_transform",
+                "ants_convergence":"$params.ants_convergence",
+                "ants_shrink":"$params.ants_shrink",
+                "ants_smoothing":"$params.ants_smoothing",
+                "use_b1cor":"$params.USE_B1",
+                "b1cor_factor":"$params.COR_B1",
+                "use_bet":"$params.USE_BET",
+                "bet_recursive":"$bet_recursive",
+                "bet_threshold":"$bet_threshold",
+                "platform":"$params.PLATFORM"
+                ]
 
     engine = new groovy.text.SimpleTemplateEngine()
     template = engine.createTemplate(usage.text).make(bindings)

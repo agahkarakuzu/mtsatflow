@@ -12,18 +12,18 @@
 % Required inputs:
 %
 %    Image file names (.nii.gz):
-%        - mtw_nii
-%        - pdw_nii 
-%        - t1w_nii  
+%        - mtw_nii subID_*
+%        - pdw_nii subID_*
+%        - t1w_nii subID_* 
 %
 %    Metadata files for BIDS (.json): 
-%        - mtw_jsn
-%        - pdw_jsn 
-%        - t1w_jsn
+%        - mtw_jsn subID_*
+%        - pdw_jsn subID_*
+%        - t1w_jsn subID_*
 %
 %    Metadata files for customized convention: 
 %      
-%        - mt_sat_prot.json (see more at USAGE.md)
+%        - mt_sat_prot.json
 %
 % mt_sat_BIDS(___,PARAM1, VAL1, PARAM2, VAL2,___)
 %
@@ -53,6 +53,10 @@
 %                       values are set to NaN (imperfect fit).
 %    
 %    FitResults.mat     Removed after fitting.
+%
+%    Subject ID         This wrapper assumes that the input data
+%                       has a subject ID prefix before the first
+%                       occurence of the '_' character.  
 %
 % Written by: Agah Karakuzu, 2020
 % GitHub:     @agahkarakuzu
@@ -205,7 +209,7 @@ end
 end 
 
 function sid = getSID(in)
-% ONLY VALID FOR BIDS
+% ASSUMES SID_*
 sid = in(1:min(strfind(in,'_'))-1);
 
 end
