@@ -82,7 +82,8 @@ end
 Model = mt_sat; 
 data = struct();
 
-if all(isempty(mtw_jsn),isempty(pdw_jsn),isempty(t1w_jsn)); customFlag = 1; end; 
+customFlag = 0;
+if all([isempty(mtw_jsn) isempty(pdw_jsn) isempty(t1w_jsn)]); customFlag = 1; end; 
 
 % Account for optional inputs and options.
 if nargin>6

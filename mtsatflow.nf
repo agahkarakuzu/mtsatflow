@@ -273,11 +273,13 @@ process Fit_MTsat_With_B1map_With_Bet{
         if (params.PLATFORM == 'octave'){
                 log.info "qMRLab::mt_sat | Octave"
                 """
+                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                     octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
                 """
                 } else{
                 log.info "qMRLab::mt_sat | MATLAB"    
                 """
+                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                   matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
                 """
                 }
@@ -305,11 +307,13 @@ process Fit_MTsat_With_B1map_Without_Bet{
              if (params.PLATFORM == 'octave'){
                 log.info "qMRLab::mt_sat | Octave"
                 """
+                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                     octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
                 """
                 } else{
                 log.info "qMRLab::mt_sat | MATLAB"    
                 """
+                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                   matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
                 """
                 }
@@ -343,11 +347,13 @@ process Fit_MTsat_Without_B1map_With_Bet{
              if (params.PLATFORM == 'octave'){
                 log.info "qMRLab::mt_sat | Octave"
                 """
+                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                     octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','custom_json','$json')"
                 """
                 } else{
                 log.info "qMRLab::mt_sat | MATLAB"
                 """
+                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                   matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','custom_json','$json')"
                 """
                 }
@@ -375,11 +381,13 @@ process Fit_MTsat_Without_B1map_Without_Bet{
             if (params.PLATFORM == 'octave'){
                 log.info "qMRLab::mt_sat | Octave"
                 """
+                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                     octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'custom_json','$json')"
                 """
                 } else{
                 log.info "qMRLab::mt_sat | MATLAB"    
                 """
+                 wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
                   matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'custom_json','$json')"
                 """
                 }
