@@ -163,6 +163,7 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
          filename2 = gunzip(filename2, tmpDir);
          filename = char(filename1);	% convert from cell to string
       elseif strcmp(filename(end-6:end), '.nii.gz')
+         disp('load nii entered here');
          tmpDir = tempname;
          mkdir(tmpDir);
          gzFileName = filename;
