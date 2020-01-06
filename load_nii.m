@@ -172,8 +172,12 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
          system('ls -la');
          [pathtmp, nametmp, exttmp] = fileparts(filename);
          disp('can part');
-         disp(fullfile(tmpDir,[nametmp,exttmp]));
-         filename = gunzip(fullfile(tmpDir,[nametmp,exttmp]));
+         system(['ls -la ' fullfile(tmpDir,[nametmp,exttmp])]);
+         try
+          filename = gunzip(fullfile(tmpDir,[nametmp,exttmp]));
+         catch
+          system(['gzip --force ' fullfile(tmpDir,[nametmp,exttmp])]);
+         end
          disp('can gunzip');
          filename = char(filename);	% convert from cell to string
       end
