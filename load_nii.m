@@ -172,7 +172,9 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
          system('ls -la');
          [pathtmp, nametmp, exttmp] = fileparts(filename);
          disp('can part');
+         disp(fullfile(tmpDir,[nametmp,exttmp]));
          filename = gunzip(fullfile(tmpDir,[nametmp,exttmp]));
+         disp('can gunzip');
          filename = char(filename);	% convert from cell to string
       end
    end
@@ -180,7 +182,7 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
    %  Read the dataset header
    %
    [nii.hdr,nii.filetype,nii.fileprefix,nii.machine] = load_nii_hdr(filename);
-
+   disp('can hdr');
    %  Read the header extension
    %
 %   nii.ext = load_nii_ext(filename);
@@ -189,7 +191,7 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
    %
    [nii.img,nii.hdr] = load_nii_img(nii.hdr,nii.filetype,nii.fileprefix, ...
 		nii.machine,img_idx,dim5_idx,dim6_idx,dim7_idx,old_RGB);
-
+    disp('can img');
    %  Perform some of sform/qform transform
    %
    nii = xform_nii(nii, tolerance, preferredForm);
