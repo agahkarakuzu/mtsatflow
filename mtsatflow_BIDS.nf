@@ -222,11 +222,11 @@ process Extract_Brain{
     script:
          if (params.bet_recursive){
         """    
-        bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold}
+        bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold
         """}
         else{
         """    
-        bet $t1w ${sid}_acq-T1w.nii.gz -m -n -f $params.bet_threshold}
+        bet $t1w ${sid}_acq-T1w.nii.gz -m -n -f $params.bet_threshold
         """
         }
 
@@ -285,7 +285,7 @@ mtsat_for_fitting_without_b1.into{mtsat_without_b1_bet;mtsat_without_b1}
 WITH B1 MAP
 */
 mtsat_with_b1_bet
-    .join(mtsat_from_bet_ch1 )
+    .join(mtsat_from_bet_ch1)
     .set{mtsat_with_b1_bet_merged}
 
 /* Depeding on the nextflow.config 
@@ -393,7 +393,7 @@ process Fit_MTsat_Without_B1map_With_Bet{
             wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
             wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
             mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
-            octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtw','$pdwj','$t1wj','mask','$mask')"
+            octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','mask','$mask')"
         """
         } else{
         log.info "qMRLab::mt_sat | MATLAB"    
