@@ -176,7 +176,7 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
          try
           filename = gunzip(fullfile(tmpDir,[nametmp,exttmp]));
          catch % Change this to nextflow env.
-          system(['gzip --force ' fullfile(tmpDir,[nametmp,exttmp])]);
+          system(['gzip -d --force ' fullfile(tmpDir,[nametmp,exttmp])]);
           system(['ls -la ' fullfile(tmpDir)]);
           disp('Hacking a bit more...');
           filename = filename(1:end-3);
