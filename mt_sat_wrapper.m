@@ -95,7 +95,6 @@ if nargin>6
     
     if any(cellfun(@isequal,varargin,repmat({'mask'},size(varargin))))
         idx = find(cellfun(@isequal,varargin,repmat({'mask'},size(varargin)))==1);
-        disp('here');
         data.Mask = double(load_nii_data(varargin{idx+1}));
     end
     
@@ -129,7 +128,6 @@ end
 
 
 % Load data
-disp('here2');
 data.MTw=double(load_nii_data(mtw_nii));
 data.PDw=double(load_nii_data(pdw_nii));
 data.T1w=double(load_nii_data(t1w_nii));

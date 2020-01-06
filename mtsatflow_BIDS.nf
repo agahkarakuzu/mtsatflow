@@ -79,6 +79,14 @@ if(params.root){
                                             tuple(sid, T1w)]}                                   
         .separate(3)
 
+    in_data = Channel
+        .fromFilePairs("$root/**/anat/sub-*_acq-{MToff,MTon,T1w}_MTS.json", maxDepth: 2, size: 3, flat: true)
+    (pdwj, mtwj, t1wj) = in_data
+        .map{sid, MToff, MTon, T1w  -> [    tuple(sid, MToff),
+                                            tuple(sid, MTon),
+                                            tuple(sid, T1w)]}                                   
+        .separate(3)    
+
     /* ==== BIDS: B1 map ==== */             
     /* Look for B1map in fmap folder */
     Channel
@@ -102,18 +110,9 @@ else{
 */
 t1w.into{t1w_pre_ch1; mtsat_for_bet; t1w_post}
 
-/*After alignment, we still need simpleName of the parent files 
- access .json content. 
-    - Given the B1map and Mask options, there are 4 possible processes.
-      Original mtw, pdw and t1w channels should be accessible by them.    
-*/
-
-pdw.into{pdw_pre_ch1;pdw_ch2;pdw_ch3}
-mtw.into{mtw_pre_ch1;mtw_ch2;mtw_ch3}
-
 /* Merge PDw, MTw and T1w for alignment*/
-pdw_pre_ch1 
-    .join(mtw_pre_ch1)
+pdw 
+    .join(mtw)
     .join(t1w_pre_ch1)
     .set{mtsat_for_alignment}
 
@@ -169,20 +168,24 @@ log.warn "Process will NOT take any (possibly) existing B1maps into account."
 
 process Align_Input_Volumes {
     tag "${sid}"
-    publishDir = "$root/derivatives/qMRLab/" 
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     input:
-    set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_alignment
+    tuple val(sid), file(pdw), file(mtw), file(t1w) from mtsat_for_alignment
 
     output:
-    set sid, "${sid}_acq-MTon_MTS_aligned.nii.gz", "${sid}_acq-MToff_MTS_aligned.nii.gz"\
+    tuple val(sid), "${sid}_acq-MTon_MTS_aligned.nii.gz", "${sid}_acq-MToff_MTS_aligned.nii.gz"\
     into mtsat_from_alignment
-   
+    file "${sid}_acq-MTon_MTS_aligned.nii.gz"
+    file "${sid}_acq-MToff_MTS_aligned.nii.gz"
+    file "${sid}_mtw_to_t1w_displacement.*.mat"
+    file "${sid}_pdw_to_t1w_displacement.*.mat"
+
     script:
     """
      antsRegistration -d $params.ants_dim\\ 
         --float 0\\ 
-        -o [${sid}_mtw2t1w,${sid}_acq-MTon_MTS_aligned.nii.gz]\\ 
+        -o [${sid}_mtw_to_t1w_displacement.mat,${sid}_acq-MTon_MTS_aligned.nii.gz]\\ 
         --transform $params.ants_transform\\ 
         --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
         $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
@@ -192,7 +195,7 @@ process Align_Input_Volumes {
 
     antsRegistration -d $params.ants_dim\\ 
         --float 0\\ 
-        -o [${sid}_pdw2t1w,${sid}_acq-MToff_MTS_aligned.nii.gz]\\ 
+        -o [${sid}_pdw_to_t1w_displacement.mat,${sid}_acq-MToff_MTS_aligned.nii.gz]\\ 
         --transform $params.ants_transform\\ 
         --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
         $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
@@ -204,17 +207,18 @@ process Align_Input_Volumes {
 
 process Extract_Brain{
     tag "${sid}"
-    publishDir = "$root/derivatives/qMRLab/"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     when:
         params.USE_BET == true
 
     input:
-    set sid, file(t1w) from mtsat_for_bet
+    tuple val(sid), file(t1w) from mtsat_for_bet
 
     output:
-    set sid, "${sid}_acq-T1w_mask.nii.gz" optional true into mtsat_from_bet
-    
+    tuple val(sid), "${sid}_acq-T1w_mask.nii.gz" optional true into mtsat_from_bet
+    file "${sid}_acq-T1w_mask.nii.gz"
+
     script:
          if (params.bet_recursive){
         """    
@@ -251,12 +255,16 @@ if (!params.USE_BET){
 /* Split mtsat_from_bet into two to deal with B1map cases later. */
 mtsat_from_bet.into{mtsat_from_bet_ch1;mtsat_from_bet_ch2}
 
+t1wj.into{t1wj_ch1;t1wj_ch2}
+pdwj.into{pdwj_ch1;pdwj_ch2}
+mtwj.into{mtwj_ch1;mtwj_ch2}
 /*Merge tw1_post with mtsat_from_alignment and b1plus.*/
 t1w_post_ch1
     .join(mfa_ch1)
     .join(b1plus)
-    .join(mtw_ch2)
-    .join(pdw_ch2)
+    .join(t1wj_ch1)
+    .join(mtwj_ch1)
+    .join(pdwj_ch1)
     .set{mtsat_for_fitting_with_b1}
 
 mtsat_for_fitting_with_b1.into{mtsat_with_b1_bet;mtsat_with_b1}
@@ -266,8 +274,9 @@ WITHOUT B1 MAP
 */
 t1w_post_ch2
     .join(mfa_ch2)
-    .join(mtw_ch3)
-    .join(pdw_ch3)
+    .join(t1wj_ch2)
+    .join(mtwj_ch2)
+    .join(pdwj_ch2)
     .set{mtsat_for_fitting_without_b1}
 
 mtsat_for_fitting_without_b1.into{mtsat_without_b1_bet;mtsat_without_b1}
@@ -286,14 +295,14 @@ following 4 processes will be executed.
 
 process Fit_MTsat_With_B1map_With_Bet{
     tag "${sid}"
-    publishDir = "$root/derivatives/qMRLab/"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     when:
         params.USE_B1 == true && params.USE_BET == true
 
     input:
-        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(b1map), file(mtw), file(pdw), file(mask) from mtsat_with_b1_bet_merged
+        tuple val(sid), file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(b1map), file(t1wj), file(mtwj), file(pdwj), file(mask) from mtsat_with_b1_bet_merged
         
 
     output:
@@ -306,12 +315,16 @@ process Fit_MTsat_With_B1map_With_Bet{
                 log.info "qMRLab::mt_sat | Octave"
                 """
                     wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1)"
+                    wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
+                    mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
+                    octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1)"
                 """
                 } else{
                 log.info "qMRLab::mt_sat | MATLAB"    
                 """
                   wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
+                  wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
+                  mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
                   matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1)"
                 """
                 }
@@ -319,14 +332,14 @@ process Fit_MTsat_With_B1map_With_Bet{
 
 process Fit_MTsat_With_B1map_Without_Bet{
     tag "${sid}"
-    publishDir = "$root/derivatives/qMRLab/"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     when:
         params.USE_B1 == true && params.USE_BET == false
 
     input:
-        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(b1map), file(mtw), file(pdw) from mtsat_with_b1
+        tuple val(sid), file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(b1map), file(t1wj), file(mtwj), file(pdwj) from mtsat_with_b1
 
     output:
         file "${sid}_T1map.nii.gz" 
@@ -338,7 +351,9 @@ process Fit_MTsat_With_B1map_Without_Bet{
                 log.info "qMRLab::mt_sat | Octave"
                 """
                     wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','b1map','$b1map','b1factor',$params.COR_B1)"
+                    wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
+                    mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
+                    octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','b1map','$b1map','b1factor',$params.COR_B1)"
                 """
                 } else{
                 log.info "qMRLab::mt_sat | MATLAB"    
@@ -357,14 +372,14 @@ mtsat_without_b1_bet
 
 process Fit_MTsat_Without_B1map_With_Bet{
     tag "${sid}"
-    publishDir = "$root/derivatives/qMRLab/"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
     
     when:
         params.USE_B1 == false && params.USE_BET==true
 
     input:
-        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(mtw), file(pdw), file(mask) from mtsat_without_b1_bet_merged
+        tuple val(sid), file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(t1wj), file(mtwj), file(pdwj), file(mask) from mtsat_without_b1_bet_merged
 
     output:
         file "${sid}_T1map.nii.gz" 
@@ -378,7 +393,7 @@ process Fit_MTsat_Without_B1map_With_Bet{
             wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
             wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
             mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
-            octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
+            octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtw','$pdwj','$t1wj','mask','$mask')"
         """
         } else{
         log.info "qMRLab::mt_sat | MATLAB"    
@@ -391,14 +406,14 @@ process Fit_MTsat_Without_B1map_With_Bet{
 
 process Fit_MTsat_Without_B1map_Without_Bet{
     tag "${sid}"
-    publishDir = "$root/derivatives/qMRLab/"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
     
     when:
         params.USE_B1 == false && params.USE_BET==false
 
     input:
-        set sid, file(t1w), file(mtw_reg), file(pdw_reg),\
-        file(mtw), file(pdw) from mtsat_without_b1
+        tuple val(sid), file(t1w), file(mtw_reg), file(pdw_reg),\
+        file(t1wj), file(mtwj), file(pdwj) from mtsat_without_b1
 
     output:
         file "${sid}_T1map.nii.gz" 
@@ -410,7 +425,9 @@ process Fit_MTsat_Without_B1map_Without_Bet{
                 log.info "qMRLab::mt_sat | Octave"
                 """
                     wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json')"
+                    wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
+                    mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
+                    octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj')"
                 """
                 } else{
                 log.info "qMRLab::mt_sat | MATLAB"    
