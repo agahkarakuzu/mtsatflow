@@ -356,7 +356,7 @@ process Fit_MTsat_Without_B1map_With_Bet{
             wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
             wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
             mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
-            octave --no-gui --eval "debug_on_error(); system('ls -la'); system('ls /Users/Agah/Desktop/KuzuData/ds-mtsat'); mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
+            octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
         """
         } else{
         log.info "qMRLab::mt_sat | MATLAB"    

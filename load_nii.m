@@ -167,23 +167,14 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
          tmpDir = tempname;
          mkdir(tmpDir);
          gzFileName = filename;
-         % Copy orig file instead.
-         copyfile(readlink(filename),tmpDir)
-         disp('can copy');
-         system('ls -la');
+         copyfile(filename,tmpDir);
          [pathtmp, nametmp, exttmp] = fileparts(filename);
-         disp('can part');
-         system(['ls -la ' fullfile(tmpDir,[nametmp,exttmp])]);
          try
           filename = gunzip(fullfile(tmpDir,[nametmp,exttmp]));
          catch % Change this to nextflow env.
           system(['gzip -d --force ' fullfile(tmpDir,[nametmp,exttmp])]);
-          system(['ls -la ' fullfile(tmpDir)]);
-          disp('Hacking a bit more...');
           filename = [tmpDir filesep filename(1:end-3)];
          end
-         disp('can gunzip');
-         disp(filename);
          filename = char(filename);	% convert from cell to string
       end
    end
@@ -191,7 +182,6 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
    %  Read the dataset header
    %
    [nii.hdr,nii.filetype,nii.fileprefix,nii.machine] = load_nii_hdr(filename);
-   disp('can hdr');
    %  Read the header extension
    %
 %   nii.ext = load_nii_ext(filename);
@@ -199,8 +189,8 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
    %  Read the dataset body
    %
    [nii.img,nii.hdr] = load_nii_img(nii.hdr,nii.filetype,nii.fileprefix, ...
-		nii.machine,img_idx,dim5_idx,dim6_idx,dim7_idx,old_RGB);
-    disp('can img');
+        nii.machine,img_idx,dim5_idx,dim6_idx,dim7_idx,old_RGB);
+        
    %  Perform some of sform/qform transform
    %
    nii = xform_nii(nii, tolerance, preferredForm);
