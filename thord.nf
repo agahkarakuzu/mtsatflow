@@ -180,30 +180,13 @@ process Align_Input_Volumes {
    
     script:
     """
-     antsRegistration -d $params.ants_dim\\ 
-        --float 0\\ 
-        -o [${sid}_mtw2t1w,${sid}_acq-MTon_MTS_aligned.nii.gz]\\ 
-        --transform $params.ants_transform\\ 
-        --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
-        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
-        --convergence $params.ants_convergence\\ 
-        --shrink-factors $params.ants_shrink\\ 
-        --smoothing-sigmas $params.ants_smoothing
-
-    antsRegistration -d $params.ants_dim\\ 
-        --float 0\\ 
-        -o [${sid}_pdw2t1w,${sid}_acq-MToff_MTS_aligned.nii.gz]\\ 
-        --transform $params.ants_transform\\ 
-        --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
-        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
-        --convergence $params.ants_convergence\\ 
-        --shrink-factors $params.ants_shrink\\ 
-        --smoothing-sigmas $params.ants_smoothing
+    touch ${sid}_acq-MTon_MTS_aligned.nii.gz
+    touch ${sid}_acq-MToff_MTS_aligned.nii.gz
     """
 }
 
 process Extract_Brain{
-    tag "${sid}"
+
     publishDir = "$root/derivatives/qMRLab/"
 
     when:
@@ -216,15 +199,10 @@ process Extract_Brain{
     set sid, "${sid}_acq-T1w_mask.nii.gz" optional true into mtsat_from_bet
     
     script:
-         if (params.bet_recursive){
         """    
-        bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold}
-        """}
-        else{
-        """    
-        bet $t1w ${sid}_acq-T1w.nii.gz -m -n -f $params.bet_threshold}
+        touch ${sid}_acq-T1w_mask.nii.gz
         """
-        }
+        
 
 }
 
@@ -285,7 +263,7 @@ following 4 processes will be executed.
 */
 
 process Fit_MTsat_With_B1map_With_Bet{
-    tag "${sid}"
+
     publishDir = "$root/derivatives/qMRLab/"
 
     when:
@@ -318,7 +296,7 @@ process Fit_MTsat_With_B1map_With_Bet{
 }
 
 process Fit_MTsat_With_B1map_Without_Bet{
-    tag "${sid}"
+
     publishDir = "$root/derivatives/qMRLab/"
 
     when:
@@ -356,7 +334,7 @@ mtsat_without_b1_bet
     .set{mtsat_without_b1_bet_merged}
 
 process Fit_MTsat_Without_B1map_With_Bet{
-    tag "${sid}"
+
     publishDir = "$root/derivatives/qMRLab/"
     
     when:
@@ -376,8 +354,7 @@ process Fit_MTsat_Without_B1map_With_Bet{
         log.info "qMRLab::mt_sat | Octave"
         """
             wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-            alias gzip='gzip -f'
-            octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
+            octave --no-gui --eval "debug_on_error(); system('ls -la'); system('ls /Users/Agah/Desktop/KuzuData/ds-mtsat'); mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
         """
         } else{
         log.info "qMRLab::mt_sat | MATLAB"    
@@ -389,7 +366,7 @@ process Fit_MTsat_Without_B1map_With_Bet{
 }
 
 process Fit_MTsat_Without_B1map_Without_Bet{
-    tag "${sid}"
+
     publishDir = "$root/derivatives/qMRLab/"
     
     when:
@@ -409,6 +386,7 @@ process Fit_MTsat_Without_B1map_Without_Bet{
                 log.info "qMRLab::mt_sat | Octave"
                 """
                     wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
+                    alias gzip='gzip -f'
                     octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json')"
                 """
                 } else{

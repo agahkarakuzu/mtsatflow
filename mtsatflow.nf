@@ -162,13 +162,30 @@ process Align_Input_Volumes {
     set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_alignment
 
     output:
-    set sid, "${sid}_acq-MTon_MTS_aligned.nii.gz", "${sid}_acq-MToff_MTS_aligned.nii.gz"\
+    set sid, "${sid}_MTw_aligned.nii.gz", "${sid}_PDw_aligned.nii.gz"\
     into mtsat_from_alignment
    
     script:
     """
-    touch ${sid}_acq-MTon_MTS_aligned.nii.gz
-    touch ${sid}_acq-MToff_MTS_aligned.nii.gz
+    antsRegistration -d $params.ants_dim\\ 
+        --float 0\\ 
+        -o [${sid}_mtw2t1w,${sid}_MTw_aligned.nii.gz]\\ 
+        --transform $params.ants_transform\\ 
+        --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
+        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+        --convergence $params.ants_convergence\\ 
+        --shrink-factors $params.ants_shrink\\ 
+        --smoothing-sigmas $params.ants_smoothing
+
+    antsRegistration -d $params.ants_dim\\ 
+        --float 0\\ 
+        -o [${sid}_pdw2t1w,${sid}_PDw_aligned.nii.gz]\\ 
+        --transform $params.ants_transform\\ 
+        --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
+        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+        --convergence $params.ants_convergence\\ 
+        --shrink-factors $params.ants_shrink\\ 
+        --smoothing-sigmas $params.ants_smoothing
     """
 }
 
@@ -183,17 +200,17 @@ process Extract_Brain{
     set sid, file(t1w) from mtsat_for_bet
 
     output:
-    set sid, "${sid}_acq-T1w_mask.nii.gz" optional true into mtsat_from_bet
+    set sid, "${sid}_T1w_mask.nii.gz" optional true into mtsat_from_bet
     
     script:
          if (params.bet_recursive){
-            """    
-            touch ${sid}_acq-T1w_mask.nii.gz
-            """}
-        else{
-            """    
-            touch ${sid}_acq-T1w_mask.nii.gz
-            """
+        """    
+        bet $t1w ${sid}_T1w.nii.gz -m -R -n -f $params.bet_threshold}
+        """}
+    else{
+        """    
+        bet $t1w ${sid}_T1w.nii.gz -m -n -f $params.bet_threshold}
+        """
         }
 
 }

@@ -67,9 +67,9 @@
 
 function mt_sat_wrapper(mtw_nii,pdw_nii,t1w_nii,mtw_jsn,pdw_jsn,t1w_jsn,varargin)
 
-if moxunit_util_platform_is_octave
-    warning('off','all');
-end
+%if moxunit_util_platform_is_octave
+%    warning('off','all');
+%end
 
 try
     disp('=============================');
@@ -95,6 +95,7 @@ if nargin>6
     
     if any(cellfun(@isequal,varargin,repmat({'mask'},size(varargin))))
         idx = find(cellfun(@isequal,varargin,repmat({'mask'},size(varargin)))==1);
+        disp('here');
         data.Mask = double(load_nii_data(varargin{idx+1}));
     end
     
@@ -128,7 +129,7 @@ end
 
 
 % Load data
-
+disp('here2');
 data.MTw=double(load_nii_data(mtw_nii));
 data.PDw=double(load_nii_data(pdw_nii));
 data.T1w=double(load_nii_data(t1w_nii));
