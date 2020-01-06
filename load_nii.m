@@ -167,7 +167,8 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
          tmpDir = tempname;
          mkdir(tmpDir);
          gzFileName = filename;
-         copyfile(filename,tmpDir)
+         % Copy orig file instead.
+         copyfile(readlink(filename),tmpDir)
          disp('can copy');
          system('ls -la');
          [pathtmp, nametmp, exttmp] = fileparts(filename);
@@ -182,6 +183,7 @@ function nii = load_nii(filename, img_idx, dim5_idx, dim6_idx, dim7_idx, ...
           filename = [tmpDir filesep filename(1:end-3)];
          end
          disp('can gunzip');
+         disp(filename);
          filename = char(filename);	% convert from cell to string
       end
    end
