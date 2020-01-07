@@ -71,6 +71,9 @@ function mt_sat_wrapper(mtw_nii,pdw_nii,t1w_nii,mtw_jsn,pdw_jsn,t1w_jsn,varargin
 %    warning('off','all');
 %end
 
+% This env var will be consumed by qMRLab
+setenv('ISNEXTFLOW','1');
+
 try
     disp('=============================');
     qMRLabVer;
@@ -177,6 +180,12 @@ delete('FitResults.mat');
 
 % TODO: 
 % .json metadata will be implemented soon (available on MP2RAGE branch). 
+
+addField = struct();
+addField.EstimationReference =  'Helms, G. et al. (2008), Magn Reson Med, 60:1396-1407';
+addField.EstimationAlgorithm =  'src/Models_Functions/MTSATfun/MTSAT_exec.m';
+provenance = Model.getProvenance('extra',addField);
+savejson('',provenance,[pwd filesep 'output_rec' '.json']);
 
 disp(['Success: ' getSID(mtw_nii)]);
 disp('-----------------------------');

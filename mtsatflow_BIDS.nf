@@ -391,8 +391,6 @@ process Fit_MTsat_Without_B1map_With_Bet{
         log.info "qMRLab::mt_sat | Octave"
         """
             wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-            wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
-            mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
             octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','mask','$mask')"
         """
         } else{
