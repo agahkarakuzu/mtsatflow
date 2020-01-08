@@ -74,12 +74,24 @@ function mt_sat_wrapper(mtw_nii,pdw_nii,t1w_nii,mtw_jsn,pdw_jsn,t1w_jsn,varargin
 % This env var will be consumed by qMRLab
 setenv('ISNEXTFLOW','1');
 
+if nargin >6
+if any(cellfun(@isequal,varargin,repmat({'qMRLab'},size(varargin))))
+    idx = find(cellfun(@isequal,varargin,repmat({'qMRLab'},size(varargin)))==1);
+    qMRdir = varargin{idx+1};
+end
+end 
+
 try
     disp('=============================');
     qMRLabVer;
 catch
-    error(['Can''t find qMRLab. Pass qMRLab root directory with parameter: ' ...
-        'mt_sat_BIDS(___,''qMRLab'', ''path_to/qMRLab'')']);
+    warning('Cant find qMRLab. Adding qMRLab_DIR to the path: ');
+    if ~strcmp(qMRdir,'null')
+        qmr_init(qMRdir);
+    else
+        error('Please set qMRLab_DIR parameter in the nextflow.config file.');
+    end
+    qMRLabVer;
 end
 
 Model = mt_sat; 
@@ -91,10 +103,6 @@ if all([isempty(mtw_jsn) isempty(pdw_jsn) isempty(t1w_jsn)]); customFlag = 1; en
 % Account for optional inputs and options.
 if nargin>6
     
-    if any(cellfun(@isequal,varargin,repmat({'qMRLab'},size(varargin))))
-       idx = find(cellfun(@isequal,varargin,repmat({'qMRLab'},size(varargin)))==1);
-       qmr_init(varargin{idx+1});
-    end
     
     if any(cellfun(@isequal,varargin,repmat({'mask'},size(varargin))))
         idx = find(cellfun(@isequal,varargin,repmat({'mask'},size(varargin)))==1);
@@ -178,20 +186,22 @@ Model.saveObj([getSID(mtw_nii) '_mt_sat.qmrlab.mat']);
 % Remove FitResults.mat 
 delete('FitResults.mat');
 
-% TODO: 
-% .json metadata will be implemented soon (available on MP2RAGE branch). 
-
 addField = struct();
 addField.EstimationReference =  'Helms, G. et al. (2008), Magn Reson Med, 60:1396-1407';
 addField.EstimationAlgorithm =  'src/Models_Functions/MTSATfun/MTSAT_exec.m';
+addField.BasedOn = [{mtw_nii},{pdw_nii},{t1w_nii}];
+
 provenance = Model.getProvenance('extra',addField);
-savejson('',provenance,[pwd filesep 'output_rec' '.json']);
+savejson('',provenance,[pwd filesep getSID(mtw_nii) '_T1map.json']);
+savejson('',provenance,[pwd filesep getSID(mtw_nii) '_MTsat.json']);
 
 disp(['Success: ' getSID(mtw_nii)]);
 disp('-----------------------------');
 disp('Saved: ');
 disp(['    ' getSID(mtw_nii) '_T1map.nii.gz'])
 disp(['    ' getSID(mtw_nii) '_MTsat.nii.gz'])
+disp(['    ' getSID(mtw_nii) '_T1map.json'])
+disp(['    ' getSID(mtw_nii) '_MTsat.json'])
 disp('=============================');
 if moxunit_util_platform_is_octave
     warning('on','all');

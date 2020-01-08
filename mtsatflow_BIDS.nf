@@ -27,6 +27,36 @@ Users: Please see USAGE for further details
 params.root = false 
 params.help = false
 
+/* Call to the mt_sat_wrapper.m will be invoked by params.runcmd.
+Depending on the params.PLATFORM selection, params.runcmd 
+may point to MATLAB or Octave. 
+*/
+if (params.PLATFORM == "octave"){
+
+    if (params.OCTAVE_PATH){
+        log.info "Using Octave executable declared in nextflow.config."
+        params.octave = params.OCTAVE_PATH + " --no-gui --eval"
+    }else{
+        log.info "Using Octave in Docker or (if local) from the sys path."
+        params.octave = "octave --no-gui --eval"
+    }
+
+    params.runcmd = params.octave 
+}
+
+if (params.PLATFORM == "matlab"){
+   
+    if (params.MATLAB_PATH){
+        log.info "Using MATLAB executable declared in nextflow.config."
+        params.matlab = params.MATLAB_PATH + " -nodisplay -nosplash -nodesktop -r"
+    }else{
+        log.info "Using MATLAB from the sys path."
+        params.matlab = "matlab -nodisplay -nosplash -nodesktop -r"
+    }
+
+    params.runcmd = params.matlab
+}
+
 /*Define bindings for --help*/
 if(params.help) {
     usage = file("$baseDir/USAGE")
@@ -307,27 +337,17 @@ process Fit_MTsat_With_B1map_With_Bet{
 
     output:
         file "${sid}_T1map.nii.gz" 
-        file "${sid}_MTsat.nii.gz" 
+        file "${sid}_MTsat.nii.gz"
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json"  
         file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-       if (params.PLATFORM == 'octave'){
-                log.info "qMRLab::mt_sat | Octave"
-                """
-                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
-                    mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
-                    octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1)"
-                """
-                } else{
-                log.info "qMRLab::mt_sat | MATLAB"    
-                """
-                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                  wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
-                  mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
-                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1)"
-                """
-                }
+        """
+            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
+
+            $params.runcmd "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','mask','$mask','b1map','$b1map','b1factor',$params.COR_B1,'qMRLab','$params.qMRLab_DIR')"
+        """
 }
 
 process Fit_MTsat_With_B1map_Without_Bet{
@@ -344,24 +364,17 @@ process Fit_MTsat_With_B1map_Without_Bet{
     output:
         file "${sid}_T1map.nii.gz" 
         file "${sid}_MTsat.nii.gz" 
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json" 
         file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-             if (params.PLATFORM == 'octave'){
-                log.info "qMRLab::mt_sat | Octave"
-                """
-                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
-                    mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
-                    octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','b1map','$b1map','b1factor',$params.COR_B1)"
-                """
-                } else{
-                log.info "qMRLab::mt_sat | MATLAB"    
-                """
-                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','b1map','$b1map','b1factor',$params.COR_B1)"
-                """
-                }
+        """
+            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
+
+            $params.runcmd "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','b1map','$b1map','b1factor',$params.COR_B1,'qMRLab','$params.qMRLab_DIR')"
+        """
+               
 }
 
 
@@ -384,22 +397,16 @@ process Fit_MTsat_Without_B1map_With_Bet{
     output:
         file "${sid}_T1map.nii.gz" 
         file "${sid}_MTsat.nii.gz" 
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json" 
         file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-        if (params.PLATFORM == 'octave'){
-        log.info "qMRLab::mt_sat | Octave"
         """
             wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-            octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','mask','$mask')"
+
+            $params.runcmd "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','mask','$mask','qMRLab','$params.qMRLab_DIR')"
         """
-        } else{
-        log.info "qMRLab::mt_sat | MATLAB"    
-        """
-            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-            matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json','mask','$mask')"
-        """
-        }
 }
 
 process Fit_MTsat_Without_B1map_Without_Bet{
@@ -415,24 +422,16 @@ process Fit_MTsat_Without_B1map_Without_Bet{
 
     output:
         file "${sid}_T1map.nii.gz" 
-        file "${sid}_MTsat.nii.gz" 
+        file "${sid}_MTsat.nii.gz"
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json"  
         file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-        if (params.PLATFORM == 'octave'){
-                log.info "qMRLab::mt_sat | Octave"
-                """
-                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    wget -O load_nii.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/load_nii.m
-                    mv ./load_nii.m /root/work/qMRLab/External/NIfTI_20140122/load_nii.m
-                    octave --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj')"
-                """
-                } else{
-                log.info "qMRLab::mt_sat | MATLAB"    
-                """
-                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz','${mtw.simpleName}.json','${pdw.simpleName}.json','${t1w.simpleName}.json')"
-                """
-                }   
+        """
+            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
+
+            $params.runcmd --no-gui --eval "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w','$mtwj','$pdwj','$t1wj','qMRLab','$params.qMRLab_DIR')"
+        """
 }
 
