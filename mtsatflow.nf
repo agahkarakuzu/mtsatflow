@@ -250,17 +250,17 @@ process Extract_Brain{
         tuple val(sid), file(t1w) from mtsat_for_bet
 
     output:
-        tuple val(sid), "${sid}_T1w_mask.nii.gz" optional true into mtsat_from_bet
-        file "${sid}_T1w_mask.nii.gz"
+        tuple val(sid), "${sid}_acq-T1w_mask.nii.gz" optional true into mtsat_from_bet
+        file "${sid}_acq-T1w_mask.nii.gz"
 
     script:
          if (params.bet_recursive){
         """    
-        bet $t1w ${sid}_T1w.nii.gz -m -R -n -f $params.bet_threshold
+        bet $t1w ${sid}_acq-T1w.nii.gz -m -R -n -f $params.bet_threshold
         """}
     else{
         """    
-        bet $t1w ${sid}_T1w.nii.gz -m -n -f $params.bet_threshold
+        bet $t1w ${sid}_acq-T1w.nii.gz -m -n -f $params.bet_threshold
         """
         }
 
