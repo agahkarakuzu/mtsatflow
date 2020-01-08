@@ -13,19 +13,56 @@ Dependencies:
     - qMRLab (https://qmrlab.org) 
         - MATLAB/Octave 
 Docker: 
-    - qmrlab/minimal
-    - qmrlab/antsfsl
+    - https://hub.docker.com/u/qmrlab
+    - qmrlab/minimal:v2.3.1
+    - qmrlab/antsfsl:latest
 
 Author:
     Agah Karakuzu 2019
     agahkarakuzu@gmail.com 
 
-Users: Please see USAGE for furhter details.
+Users: Please see USAGE for further details
  */
 
 /*Set defaults for parameters determining logic flow to false*/
 params.root = false 
 params.help = false
+
+/* Call to the mt_sat_wrapper.m will be invoked by params.runcmd.
+Depending on the params.PLATFORM selection, params.runcmd 
+may point to MATLAB or Octave. 
+*/
+if (params.PLATFORM == "octave"){
+
+    if (params.OCTAVE_PATH){
+        log.info "Using Octave executable declared in nextflow.config."
+        params.octave = params.OCTAVE_PATH + " --no-gui --eval"
+    }else{
+        log.info "Using Octave in Docker or (if local) from the sys path."
+        params.octave = "octave --no-gui --eval"
+    }
+
+    params.runcmd = params.octave 
+}
+
+if (params.PLATFORM == "matlab"){
+   
+    if (params.MATLAB_PATH){
+        log.info "Using MATLAB executable declared in nextflow.config."
+        params.matlab = params.MATLAB_PATH + " -nodisplay -nosplash -nodesktop -r"
+    }else{
+        log.info "Using MATLAB from the sys path."
+        params.matlab = "matlab -nodisplay -nosplash -nodesktop -r"
+    }
+
+    params.runcmd = params.matlab
+}
+
+workflow.onComplete {
+    log.info "Pipeline completed at: $workflow.complete"
+    log.info "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
+    log.info "Execution duration: $workflow.duration"
+}
 
 /*Define bindings for --help*/
 if(params.help) {
@@ -47,7 +84,10 @@ if(params.help) {
                 "use_bet":"$params.USE_BET",
                 "bet_recursive":"$params.bet_recursive",
                 "bet_threshold":"$params.bet_threshold",
-                "platform":"$params.PLATFORM"
+                "platform":"$params.PLATFORM",
+                "matlab_path":"$params.MATLAB_PATH",
+                "octave_path":"$params.OCTAVE_PATH",
+                "qmrlab_dir":"$params.qMRLab_DIR"
                 ]
 
     engine = new groovy.text.SimpleTemplateEngine()
@@ -107,7 +147,6 @@ log.info "======================="
 log.info ""
 log.info "Start time: $workflow.start"
 log.info ""
-log.info ""
 log.info "DATA"
 log.info "===="
 log.info ""
@@ -116,6 +155,12 @@ log.warn "If an mtsat_protocol.json file is NOT provided for a subject, operatio
 log.info ""
 log.info "OPTIONS"
 log.info "======="
+log.info ""
+log.info "[GLOBAL]"
+log.info "---------------"
+log.info "Selected platform: $params.PLATFORM"
+log.info "BET enabled: $params.USE_BET"
+log.info "B1+ correction enabled: $params.USE_B1"
 log.info ""
 log.info "[ANTs Registration]"
 log.info "-------------------"
@@ -138,7 +183,6 @@ log.info "Robust brain center estimation: $params.bet_recursive"
 log.info ""
 log.info "[qMRLab mt_sat]"
 log.info "---------------"
-log.info ""
 log.warn "Acquisition protocols will be read from mt_sat_prot.json file."
 if (params.USE_B1){
 log.info "B1+ correction has been ENABLED."  
@@ -148,6 +192,8 @@ if (!params.USE_B1){
 log.info "B1+ correction has been DISABLED."
 log.warn "Process will NOT take any (possibly) existing B1maps into account."
 }
+log.info ""
+log.info "======================="
 
 /*Perform rigid registration to correct for head movement across scans:
     - MTw (moving) --> T1w (fixed)
@@ -155,61 +201,66 @@ log.warn "Process will NOT take any (possibly) existing B1maps into account."
 */     
 
 process Align_Input_Volumes {
-
-    publishDir = "$root/derivatives/qMRLab/" 
+    tag "${sid}"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     input:
-    set sid, file(pdw), file(mtw), file(t1w) from mtsat_for_alignment
+        tuple val(sid), file(pdw), file(mtw), file(t1w) from mtsat_for_alignment
 
     output:
-    set sid, "${sid}_MTw_aligned.nii.gz", "${sid}_PDw_aligned.nii.gz"\
-    into mtsat_from_alignment
+        tuple val(sid), "${sid}_MTw_aligned.nii.gz", "${sid}_PDw_aligned.nii.gz"\
+        into mtsat_from_alignment
+        file "${sid}_MTw_aligned.nii.gz"
+        file "${sid}_PDw_aligned.nii.gz"
+        file "${sid}_mtw_to_t1w_displacement.*.mat"
+        file "${sid}_pdw_to_t1w_displacement.*.mat"
    
     script:
-    """
-    antsRegistration -d $params.ants_dim\\ 
-        --float 0\\ 
-        -o [${sid}_mtw2t1w,${sid}_MTw_aligned.nii.gz]\\ 
-        --transform $params.ants_transform\\ 
-        --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
-        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
-        --convergence $params.ants_convergence\\ 
-        --shrink-factors $params.ants_shrink\\ 
-        --smoothing-sigmas $params.ants_smoothing
+        """
+        antsRegistration -d $params.ants_dim\\ 
+            --float 0\\ 
+            -o [${sid}_mtw_to_t1w_displacement.mat,${sid}_MTw_aligned.nii.gz]\\ 
+            --transform $params.ants_transform\\ 
+            --metric $params.ants_metric[$t1w,$mtw,$params.ants_metric_weight,\\
+            $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+            --convergence $params.ants_convergence\\ 
+            --shrink-factors $params.ants_shrink\\ 
+            --smoothing-sigmas $params.ants_smoothing
 
-    antsRegistration -d $params.ants_dim\\ 
-        --float 0\\ 
-        -o [${sid}_pdw2t1w,${sid}_PDw_aligned.nii.gz]\\ 
-        --transform $params.ants_transform\\ 
-        --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
-        $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
-        --convergence $params.ants_convergence\\ 
-        --shrink-factors $params.ants_shrink\\ 
-        --smoothing-sigmas $params.ants_smoothing
-    """
+        antsRegistration -d $params.ants_dim\\ 
+            --float 0\\ 
+            -o [${sid}_pdw_to_t1w_displacement.mat,${sid}_PDw_aligned.nii.gz]\\ 
+            --transform $params.ants_transform\\ 
+            --metric $params.ants_metric[$t1w,$pdw,$params.ants_metric_weight,\\
+            $params.ants_metric_bins,$params.ants_metric_sampling,$params.ants_metric_samplingprct]\\ 
+            --convergence $params.ants_convergence\\ 
+            --shrink-factors $params.ants_shrink\\ 
+            --smoothing-sigmas $params.ants_smoothing
+        """
 }
 
 process Extract_Brain{
-
-    publishDir = "$root/derivatives/qMRLab/"
+    tag "${sid}"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     when:
         params.USE_BET == true
 
     input:
-    set sid, file(t1w) from mtsat_for_bet
+        tuple val(sid), file(t1w) from mtsat_for_bet
 
     output:
-    set sid, "${sid}_T1w_mask.nii.gz" optional true into mtsat_from_bet
-    
+        tuple val(sid), "${sid}_T1w_mask.nii.gz" optional true into mtsat_from_bet
+        file "${sid}_T1w_mask.nii.gz"
+
     script:
          if (params.bet_recursive){
         """    
-        bet $t1w ${sid}_T1w.nii.gz -m -R -n -f $params.bet_threshold}
+        bet $t1w ${sid}_T1w.nii.gz -m -R -n -f $params.bet_threshold
         """}
     else{
         """    
-        bet $t1w ${sid}_T1w.nii.gz -m -n -f $params.bet_threshold}
+        bet $t1w ${sid}_T1w.nii.gz -m -n -f $params.bet_threshold
         """
         }
 
@@ -270,8 +321,8 @@ following 4 processes will be executed.
 */
 
 process Fit_MTsat_With_B1map_With_Bet{
-
-    publishDir = "$root/derivatives/qMRLab/"
+    tag "${sid}"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     when:
         params.USE_B1 == true && params.USE_BET == true
@@ -279,34 +330,26 @@ process Fit_MTsat_With_B1map_With_Bet{
     input:
         set sid, file(t1w), file(mtw_reg), file(pdw_reg), file(json),\
         file(b1map), file(mask) from mtsat_with_b1_bet_merged
-        
 
     output:
         file "${sid}_T1map.nii.gz" 
-        file "${sid}_MTsat.nii.gz" 
+        file "${sid}_MTsat.nii.gz"
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json"  
         file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-        if (params.PLATFORM == 'octave'){
-                log.info "qMRLab::mt_sat | Octave"
-                """
-                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
-                """
-                } else{
-                log.info "qMRLab::mt_sat | MATLAB"    
-                """
-                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
-                """
-                }
+        """
+            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
+
+            $params.runcmd "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w',[],[],[],'mask','$mask','b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json','qMRLab','$params.qMRLab_DIR'); exit();"
+        """
             
 }
 
 process Fit_MTsat_With_B1map_Without_Bet{
-    cpus 1
-
-    publishDir = "$root/derivatives/qMRLab/"
+    tag "${sid}"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
     when:
         params.USE_B1 == true && params.USE_BET == false
@@ -316,27 +359,19 @@ process Fit_MTsat_With_B1map_Without_Bet{
         file(b1map) from mtsat_with_b1
 
     output:
-       file "${sid}_T1map.nii.gz"
-       file  "${sid}_MTsat.nii.gz"
-       file "${sid}_mt_sat.qmrlab.mat"
+        file "${sid}_T1map.nii.gz" 
+        file "${sid}_MTsat.nii.gz"
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json"  
+        file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-             if (params.PLATFORM == 'octave'){
-                log.info "qMRLab::mt_sat | Octave"
-                """
-                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
-                """
-                } else{
-                log.info "qMRLab::mt_sat | MATLAB"    
-                """
-                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json')"
-                """
-                }
-            
-}
+        """
+            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
 
+            $params.runcmd "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w',[],[],[],'b1map','$b1map','b1factor',$params.COR_B1,'custom_json','$json','qMRLab','$params.qMRLab_DIR'); exit();"
+        """            
+}
 
 /* We need to join these channels to avoid problems.*/
 mtsat_without_b1_bet
@@ -344,9 +379,8 @@ mtsat_without_b1_bet
     .set{mtsat_without_b1_bet_merged}
 
 process Fit_MTsat_Without_B1map_With_Bet{
-    cpus 1
-
-    publishDir = "$root/derivatives/qMRLab/"
+    tag "${sid}"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
     
     when:
         params.USE_B1 == false && params.USE_BET==true
@@ -356,32 +390,25 @@ process Fit_MTsat_Without_B1map_With_Bet{
         file(mask) from mtsat_without_b1_bet_merged
 
     output:
-        file "${sid}_T1map.nii.gz"
+        file "${sid}_T1map.nii.gz" 
         file "${sid}_MTsat.nii.gz"
-        file  "${sid}_mt_sat.qmrlab.mat"
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json"  
+        file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-             if (params.PLATFORM == 'octave'){
-                log.info "qMRLab::mt_sat | Octave"
-                """
-                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','custom_json','$json')"
-                """
-                } else{
-                log.info "qMRLab::mt_sat | MATLAB"
-                """
-                  wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'mask','$mask','custom_json','$json')"
-                """
-                }
+        """
+            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
+
+            $params.runcmd "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w',[],[],[],'mask','$mask','custom_json','$json','qMRLab','$params.qMRLab_DIR'); exit();"
+        """
             
 }
 
 process Fit_MTsat_Without_B1map_Without_Bet{
-    cpus 1
+    tag "${sid}"
+    publishDir "$root/derivatives/qMRLab/${sid}", mode: 'copy'
 
-    publishDir = "$root/derivatives/qMRLab/"
-    
     when:
         params.USE_B1 == false && params.USE_BET==false
 
@@ -390,24 +417,17 @@ process Fit_MTsat_Without_B1map_Without_Bet{
         file(json) from mtsat_without_b1
 
     output:
-        file "${sid}_T1map.nii.gz"
-        file  "${sid}_MTsat.nii.gz"
-        file  "${sid}_mt_sat.qmrlab.mat"
+        file "${sid}_T1map.nii.gz" 
+        file "${sid}_MTsat.nii.gz"
+        file "${sid}_T1map.json" 
+        file "${sid}_MTsat.json"  
+        file "${sid}_mt_sat.qmrlab.mat"
 
     script: 
-            if (params.PLATFORM == 'octave'){
-                log.info "qMRLab::mt_sat | Octave"
-                """
-                    wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                    octave --no-gui --eval "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'custom_json','$json')"
-                """
-                } else{
-                log.info "qMRLab::mt_sat | MATLAB"    
-                """
-                 wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
-                  matlab -nodisplay -nosplash -nodesktop -r "mt_sat_wrapper('${mtw_reg.simpleName}.nii.gz','${pdw_reg.simpleName}.nii.gz','${t1w.simpleName}.nii.gz',[],[],[],'custom_json','$json')"
-                """
-                }
+        """
+            wget -O mt_sat_wrapper.m https://raw.githubusercontent.com/agahkarakuzu/mtsatflow/master/mt_sat_wrapper.m
             
+            $params.runcmd "mt_sat_wrapper('$mtw_reg','$pdw_reg','$t1w',[],[],[],'custom_json','$json','qMRLab','$params.qMRLab_DIR'); exit();"
+        """
+    
 }
-
